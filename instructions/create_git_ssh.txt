@@ -1,0 +1,14 @@
+
+
+
+cd ~
+mkdir .ssh
+cd .ssh
+ssh-keygen
+(press enter 3 times without typing anythong)
+cat id_rsa.pub
+(copy the contents)
+(go to your github account, security for your account - not repo)
+(Settings/SSH create one and paste in this)
+
+
