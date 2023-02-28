@@ -132,3 +132,6 @@ dmypy.json
 # Don't upload secret data
 instructions/rel_to_pypi.txt
 
+# Don;t upload test data
+*.ccp4
+*.pdb
