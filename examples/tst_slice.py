@@ -31,7 +31,7 @@ samples=5
 def nearest_slice():
     print("Checking simple nearest slice")
     # the 3d data is in a list of values, with the fastest changing axis first, called F, M, S (fast, medium, slow)    
-    itrp = near.Nearest(vals,F=f,M=m,S=s)
+    itrp = near.Nearest(vals,F=f,M=m,S=s,log_level=1)
     spc = space.SpaceTransform(central, linear, planar)
     gm = grid.GridMaker()    
     u_coords = gm.get_unit_grid(width,samples)        

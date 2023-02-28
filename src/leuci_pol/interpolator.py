@@ -8,12 +8,15 @@ import math
 
 
 class Interpolator(ABC):
-    def __init__(self, values, F=-1, M=-1, S=-1):
+    def __init__(self, values, F=-1, M=-1, S=-1, log_level=0):
         self._values = values  
         self._F = F
         self._M = M
         self._S = S
         self._buffer = 28
+        self.log_level = log_level
+        if F == -1 or M == -1 or S == -1:
+            assert("FMS size not entered")
         
     @abstractmethod
     def get_value(self, x, y, z):
@@ -94,6 +97,8 @@ class Interpolator(ABC):
             row = []
             for j in range(len(unit_coords[0])):
                 vec = unit_coords[i][j]
+                if self.log_level > 0:
+                    print("Get value", vec.A,vec.B,vec.C)
                 vec_val = self.get_value(vec.A,vec.B,vec.C)
                 row.append(vec_val)
             vals.append(row)
