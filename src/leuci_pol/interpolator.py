@@ -5,19 +5,32 @@
 from abc import ABC, abstractmethod
 from leuci_xyz import vectorthree as v3
 import math
+import numpy as np
+from . import invariant as ivm
 
+### Factory method for creation ##############################################################
+def create_interpolator(method, values, F, M, S, degree=0, log_level=0):
+    intr = None
+    if method == "linear":
+        intr = Multivariate(values, F, M, S, 1, log_level)
+    elif method == "cubic":
+        intr = Multivariate(values, F, M, S, 3, log_level)
+    else: #nearest is default
+        intr = Nearest(values, F, M, S, log_level)
+    intr.init()
+    return intr
 
+### Abstract class ############################################################################
 class Interpolator(ABC):
-    def __init__(self, values, F=-1, M=-1, S=-1, log_level=0):
+    def __init__(self, values, F, M, S, degree, log_level=0):
         self._values = values  
         self._F = F
         self._M = M
         self._S = S
+        self.degree = degree
         self._buffer = 28
         self.log_level = log_level
-        if F == -1 or M == -1 or S == -1:
-            assert("FMS size not entered")
-        
+                
     @abstractmethod
     def get_value(self, x, y, z):
         pass
@@ -103,6 +116,116 @@ class Interpolator(ABC):
                 row.append(vec_val)
             vals.append(row)
         return vals
+
+    def build_cube_around(self, x, y, z, width):        
+        # 1. Build the points around the centre as a cube - width points
+        vals = []            
+        xp,yp,zp = 0,0,0 
+        for i in range(int(-1*width/2 + 1), int(width/2 + 1)):
+            xp = math.floor(x + i)
+            for j in range(int(-1*width/2 + 1), int(width/2 + 1)):      
+                yp = math.floor(y + j)
+                for k in range(int(-1*width/2 + 1), int(width/2 + 1)):          
+                    zp = math.floor(z + k)                        
+                    p = self.get_fms(xp, yp, zp)
+                    vals.append(p)                    
+        return vals
+
+    def mult_vector(self,A, V):        
+        length = len(V)
+        results = []
+        for row in range(length):        
+            sum = 0
+            for col in range(length):
+                mv = A[row,col]
+                vv = V[col]
+                sum += mv*vv                
+            results.append(sum)
+        return results
+    
+
+####################################################################################################
+### NEAREST NEIGHBOUR
+####################################################################################################
+class Nearest(Interpolator):                
+    def init(self):
+        pass
+    def get_value(self, x, y, z):
+        closest_pnt = self.closest(v3.VectorThree(x,y,z))  
+        #print(closest_pnt.A, closest_pnt.B,closest_pnt.C)      
+        return self.get_fms(closest_pnt.A, closest_pnt.B,closest_pnt.C)
+####################################################################################################
+### LINEAR
+####################################################################################################
+class Multivariate(Interpolator):                
+    def init(self):
+        self.points = self.degree + 1
+        self.dimsize = math.pow(self.points, 3)
+        self.inv = ivm.InvariantVandermonde(self.degree)
+        self.need_new = True
+        self._xfloor = -1
+        self._yfloor = -1
+        self._zfloor = -1
+    def get_value(self, x, y, z):        
+        # The method of linear interpolation is a version of my own method for multivariate fitting, instead of trilinear interpolation
+        # NOTE I could extend this to be multivariate not linear but it has no advantage over bspline - and is slower and not as good 
+        # Document is here: https://rachelalcraft.github.io/Papers/MultivariateInterpolation/MultivariateInterpolation.pdf                        
+        recalc = self.need_new
+        #we can reuse our last matrix if the points are within the same unit cube
+        xFloor = math.floor(x)
+        yFloor = math.floor(y)
+        zFloor = math.floor(z)
+        if not recalc:
+            if (xFloor != self.xfloor):
+                recalc = True
+            if (yFloor != self.yfloor):
+                recalc = True
+            if (zFloor != self.zfloor):
+                recalc = True
+
+        if (recalc):        
+            self.xfloor = math.floor(x)
+            self.yfloor = math.floor(y)
+            self.zfloor = math.floor(z)
+            # 1. Build the points around the centre as a cube - 8 points
+            vals = self.build_cube_around(x, y, z, self.points)
+            #2. Multiply with the precomputed matrix to find the multivariate polynomial
+            ABC = self.mult_vector(self.inv.get_invariant(), vals)
+            # 3. Put the 8 values back into a cube
+            self.polyCoeffs = np.zeros((self.points, self.points, self.points))
+            pos = 0;
+            for i in range(self.points):
+                for j in range(self.points):                
+                    for k in range(self.points):                    
+                        self.polyCoeffs[i, j, k] = ABC[pos]
+                        pos+=1
+            self.need_new = False        
+        #4. Adjust the values to be within this cube
+        pstart = (-1 * self.points / 2) + 1        
+        xn = x - math.floor(x) - pstart
+        yn = y - math.floor(y) - pstart
+        zn = z - math.floor(z) - pstart
+
+        #5. Apply the multivariate polynomial coefficents to find the value
+        #return self.get_value_multivariate(zn, yn, xn, self.polyCoeffs)
+        return self.get_value_multivariate(zn, yn, xn, self.polyCoeffs)
+
+    def get_value_multivariate(self, x, y, z, coeffs):        
+        #This is using a value scheme that makes sens of our new fitted polyCube
+        #In a linear case it will be a decimal between 0 and 1          
+        value = 0
+        ii,jj,kk = coeffs.shape
+        for i in range(ii):        
+            for j in range(jj):            
+                for k in range(kk):                
+                    coeff = coeffs[i, j, k];                    
+                    val = coeff * math.pow(z, i) * math.pow(y, j) * math.pow(x, k)
+                    value += val                                    
+        return value
+            
+####################################################################################################
+### LINEAR
+####################################################################################################
     
     
         

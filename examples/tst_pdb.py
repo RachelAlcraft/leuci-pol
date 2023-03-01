@@ -13,7 +13,7 @@ CODEDIR = str(Path(__file__).resolve().parent.parent )+ "/src/"
 sys.path.append(CODEDIR)
 from pathlib import Path
 
-import leuci_pol.nearest as near
+import leuci_pol.interpolator as pol
 from leuci_xyz import gridmaker as grid
 from leuci_xyz import spacetransform as space
 import leuci_xyz.vectorthree as v3
@@ -25,7 +25,7 @@ linear = v3.VectorThree(2,2,2)
 planar = v3.VectorThree(3,2,3)
 pdb_code = "6eex"
 width=5
-samples=200[pip install leuci-xyz --up]
+samples=200
 
 ########## EXAMPLE #################
 def single_slice():
@@ -43,8 +43,8 @@ def single_slice():
             m = po.mobj.M
             s = po.mobj.S
             print("Creating slice", pdb_code)
-
-            itrp = near.Nearest(vals,F=f,M=m,S=s,log_level=1)
+            
+            itrp = pol.create_interpolator("nearest",vals,F=f,M=m,S=s,log_level=1)    
             spc = space.SpaceTransform(central, linear, planar)
             gm = grid.GridMaker()    
             u_coords = gm.get_unit_grid(width,samples)        

@@ -15,22 +15,31 @@ from leuci_xyz import vectorthree as v3
 
 
 ########## INPUTS #################
-
-
+full_test = False
 
 ########## EXAMPLE #################
 def nearest_interp():
-    print("Checking simple nearest")
+    print("Checking simple linear")
     # the 3d data is in a list of values, with the fastest changing axis first, called F, M, S (fast, medium, slow)
     vals = [1,2,3,4,5,6,7,8]
     f,m,s = 2,2,2
-    nr_pol = pol.create_interpolator("nearest",vals,F=f,M=m,S=s)
-    lin_pol = pol.create_interpolator("linear",vals,F=f,M=m,S=s)
-    for intr in [nr_pol, lin_pol]:    
-        print("Using ", type(intr))
-        #print("Is interpolator", isinstance(intr,inter.Interpolator))
-        #print("... linear?", isinstance(intr,line.Linear))
-        #print("... nearest?", isinstance(intr,near.Nearest))                                
+    # simplest creation of an interpolator, add values, specify the axis, ask for a value
+    intr = pol.create_interpolator("linear",vals,F=f,M=m,S=s,log_level=1)    
+    print("1 =", intr.get_value(0,0,0)) 
+    print("2 =", intr.get_value(1,0,0)) 
+    print("3 =", intr.get_value(0,1,0)) 
+    print("5 =", intr.get_value(0,0,1)) 
+    print("8 =", intr.get_value(1,1,1)) 
+    print("half ways")
+    print("1.5 =", intr.get_value(0.5,0,0))#1-2
+    print("2 =", intr.get_value(0,0.5,0)) #1-3
+    print("3 =", intr.get_value(0,0,0.5)) #1-5
+    
+
+    if full_test:
+
+
+        # Some testing
         print(intr.get_pos_from_fms(0,0,0),intr.get_value(0,0,0))
         print(intr.get_pos_from_fms(1,0,0),intr.get_value(1,0,0))
         print(intr.get_pos_from_fms(0,1,0),intr.get_value(0,1,0))
@@ -50,8 +59,21 @@ def nearest_interp():
         print(intr.get_fms_from_pos(6))
         print(intr.get_fms_from_pos(7))
 
-        print("Interp to 0.5,0.5,0.5 = ", intr.get_value(0.5,0.5,0.5))
-        print("Interp to 1,1,0.9 = ", intr.get_value(1,1,0.9))
-        print("Interp to 1,1,1.9 = ", intr.get_value(1,1,1.9))
+        print("Interp to 0.5,0.5,0.4")
+        print("... =", intr.get_value(0.5,0.5,0.4))
+        print("Interp to 0.5,0.5,0.5 = ")
+        print("... =", intr.get_value(0.5,0.5,0.5))
+        print("Interp to 0.5,0.5,0.6 = ")
+        print("... =", intr.get_value(0.5,0.5,0.6))
+        print("Interp to 1,1,0.9 = ")
+        print("... =", intr.get_value(1,1,0.9))
+        print("Interp to 1,1,1.9 = ")
+        print("... =", intr.get_value(1,1,1.9))
+
+        print("Interp to -0.5,-0.5,-0.5 = ")
+        print("... =", intr.get_value(-0.5,-0.5,-0.5))
+        print("... =", intr.get_value(1.5,1.5,1.5))
+        print("... =", intr.get_value(1.5,1.5,1.6))
+        print("... =", intr.get_value(1.6,1.6,1.6))
                         
 nearest_interp()
