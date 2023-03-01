@@ -29,15 +29,47 @@ class Interpolator(ABC):
         self._S = S
         self.degree = degree
         self._buffer = 28
-        self.log_level = log_level
+        self.log_level = log_level         
+        self.h = 0.00001 #this is the iunterval for numerical differentiation
                 
     @abstractmethod
     def get_value(self, x, y, z):
         pass
 
-
-    # implemented interface that is the same for all abstractions    
+    # implemented interface that is the same for all abstractions
+    def get_radient(self, x, y, z):        
+        val = self.get_value(x, y, z)
+        dx = (self.get_value(x + self.h, y, z) - val) / self.h
+        dy = (self.get_value(x, y + self.h, z) - val) / self.h
+        dz = (self.get_value(x, y, z + self.h) - val) / self.h
+        radient = (abs(dx) + abs(dy) + abs(dz)) / 3
+        return radient
         
+    def get_laplacian(self, x, y, z):        
+        val = self.get_value(x, y, z)
+        xx = self.getDxDx(x, y, z, val)
+        yy = self.getDyDy(x, y, z, val)
+        zz = self.getDzDz(x, y, z, val)
+        return xx + yy + zz 
+        
+    def getDxDx(self, x, y, z, val):        
+        va = self.get_value(x - self.h, y, z)
+        vb = self.get_value(x + self.h, y, z)
+        dd = (va + vb - 2 * val) / (self.h * self.h)
+        return dd
+        
+    def getDyDy(self, x, y, z, val):        
+        va = self.get_value(x, y - self.h, z)
+        vb = self.get_value(x, y + self.h, z)
+        dd = (va + vb - 2 * val) / (self.h * self.h)
+        return dd
+        
+    def getDzDz(self, x, y, z, val):        
+        va = self.get_value(x, y, z - self.h)
+        vb = self.get_value(x, y, z + self.h)
+        dd = (va + vb - 2 * val) / (self.h * self.h)
+        return dd
+                
     def get_fms(self,f,m,s):
         u_f = f
         u_m = m
@@ -104,7 +136,7 @@ class Interpolator(ABC):
                     cnrs.append(v3.VectorThree(x+f,y+m,z+s)) 
         return cnrs
     
-    def get_val_slice(self,unit_coords):
+    def get_val_slice(self,unit_coords, diff = 0):
         vals = []
         for i in range(len(unit_coords)):
             row = []
@@ -112,7 +144,12 @@ class Interpolator(ABC):
                 vec = unit_coords[i][j]
                 if self.log_level > 0:
                     print("Get value", vec.A,vec.B,vec.C)
-                vec_val = self.get_value(vec.A,vec.B,vec.C)
+                if diff == 2:
+                    vec_val = self.get_laplacian(vec.A,vec.B,vec.C)
+                elif diff == 1:
+                    vec_val = self.get_radient(vec.A,vec.B,vec.C)
+                else:
+                    vec_val = self.get_value(vec.A,vec.B,vec.C)
                 row.append(vec_val)
             vals.append(row)
         return vals

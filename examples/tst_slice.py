@@ -26,7 +26,7 @@ linear = v3.VectorThree(1,1,0)
 planar = v3.VectorThree(0,0,0)
 width=2
 samples=5
-method="linear"
+method="nearest"
 
 ########## EXAMPLE #################
 def nearest_slice():
@@ -36,9 +36,13 @@ def nearest_slice():
     spc = space.SpaceTransform(central, linear, planar)
     gm = grid.GridMaker()    
     u_coords = gm.get_unit_grid(width,samples)        
-    xyz_coords = spc.get_coords(u_coords)
+    xyz_coords = spc.get_coords(u_coords)    
     sl_vals = itrp.get_val_slice(xyz_coords)
-    print(sl_vals)
+    sl_rads = itrp.get_val_slice(xyz_coords,diff=1)
+    sl_laps = itrp.get_val_slice(xyz_coords,diff=2)
+    print("Values", sl_vals)
+    print("Radient", sl_rads)
+    print("Laplacian", sl_laps)
     
                         
 nearest_slice()
