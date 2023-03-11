@@ -136,7 +136,7 @@ class Interpolator(ABC):
                     cnrs.append(v3.VectorThree(x+f,y+m,z+s)) 
         return cnrs
     
-    def get_val_slice(self,unit_coords, diff = 0):
+    def get_val_slice(self,unit_coords, deriv = 0):
         vals = []
         for i in range(len(unit_coords)):
             row = []
@@ -144,9 +144,9 @@ class Interpolator(ABC):
                 vec = unit_coords[i][j]
                 if self.log_level > 0:
                     print("Get value", vec.A,vec.B,vec.C)
-                if diff == 2:
+                if deriv == 2:
                     vec_val = self.get_laplacian(vec.A,vec.B,vec.C)
-                elif diff == 1:
+                elif deriv == 1:
                     vec_val = self.get_radient(vec.A,vec.B,vec.C)
                 else:
                     vec_val = self.get_value(vec.A,vec.B,vec.C)
@@ -166,19 +166,25 @@ class Interpolator(ABC):
                     zp = math.floor(z + k)                        
                     p = self.get_fms(xp, yp, zp)
                     vals.append(p)                    
-        return vals
+        npvals = np.array(vals)    
+        return npvals
 
-    def mult_vector(self,A, V):        
-        length = len(V)
-        results = []
-        for row in range(length):        
-            sum = 0
-            for col in range(length):
-                mv = A[row,col]
-                vv = V[col]
-                sum += mv*vv                
-            results.append(sum)
-        return results
+    def mult_vector(self,A, V):     #A and V are numpy arrays
+        use_np = True
+        if use_np:
+            mm = np.matmul(A,V)            
+            return mm
+        else:   
+            length = len(V)
+            results = []
+            for row in range(length):        
+                sum = 0
+                for col in range(length):
+                    mv = A[row,col]
+                    vv = V[col]
+                    sum += mv*vv                
+                results.append(sum)
+            return results
     
 
 ####################################################################################################
