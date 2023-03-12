@@ -15,16 +15,17 @@ from leuci_xyz import vectorthree as v3
 
 
 ########## INPUTS #################
+#test_methods = ["nearest","linear","cubic"]
+test_methods = ["cubic","bspline"]
 full_test = False
 
 ########## EXAMPLE #################
-def nearest_interp():
-    print("Checking simple cubic")
+def nearest_interp(interp_method):    
     # the 3d data is in a list of values, with the fastest changing axis first, called F, M, S (fast, medium, slow)
     vals = [1,2,3,4,5,6,7,8]
     f,m,s = 2,2,2
     # simplest creation of an interpolator, add values, specify the axis, ask for a value
-    intr = pol.create_interpolator("cubic",vals,F=f,M=m,S=s,log_level=1)    
+    intr = pol.create_interpolator(interp_method,vals,F=f,M=m,S=s,log_level=1)    
     print("1 =", intr.get_value(0,0,0)) 
     print("2 =", intr.get_value(1,0,0)) 
     print("3 =", intr.get_value(0,1,0)) 
@@ -36,8 +37,8 @@ def nearest_interp():
     print("3 =", intr.get_value(0,0,0.5)) #1-5
     
 
+    
     if full_test:
-
 
         # Some testing
         print(intr.get_pos_from_fms(0,0,0),intr.get_value(0,0,0))
@@ -76,4 +77,7 @@ def nearest_interp():
         print("... =", intr.get_value(1.5,1.5,1.6))
         print("... =", intr.get_value(1.6,1.6,1.6))
                         
-nearest_interp()
+#######################################################
+for interp_method in test_methods:
+    print("#### Testing", interp_method, "####")
+    nearest_interp(interp_method)
