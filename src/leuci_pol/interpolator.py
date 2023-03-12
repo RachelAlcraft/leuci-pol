@@ -109,17 +109,17 @@ class Interpolator(ABC):
         # Unit wrap F
         while u_f < 0:
             u_f += use_f
-        while u_f > use_f-1:
+        while u_f >= use_f:
             u_f -= use_f
         # Unit wrap M
         while u_m < 0:
             u_m += use_m
-        while u_m > use_m-1:
+        while u_m >= use_m:
             u_m -= use_m
         # Unit wrap S
         while u_s < 0:
             u_s += use_s
-        while u_s > use_s-1:
+        while u_s >= use_s:
             u_s -= use_s
         return u_f, u_m, u_s
         
@@ -307,24 +307,24 @@ class Bspline(Interpolator):
             
     def make_periodic_coeffs(self):           
         # we make the coefficients matrix a bit bigger than the vaues and have it wrap, and then cut it back down to the values                 
-        #self._coeffs =#self.extend_vals_with_buffer(self._buffer)
-        #tmpF = self._F + (2 * self._buffer)
-        #tmpM = self._M + (2 * self._buffer)
-        #tmpS = self._S + (2 * self._buffer)                
-        #self.create_coeffs(tmpF,tmpM,tmpS)
-        #self._coeffs = self.reduce_vals_with_buffer(self._buffer, self._coeffs,tmpF,tmpM,tmpS)
-        self._coeffs = np.copy(self._npy)
-        self.create_coeffs(self._F,self._M,self._S)
+        self._coeffs =self.extend_vals_with_buffer(self._buffer)
+        tmpF = self._F + (2 * self._buffer)
+        tmpM = self._M + (2 * self._buffer)
+        tmpS = self._S + (2 * self._buffer)                
+        self.create_coeffs(tmpF,tmpM,tmpS)        
+        self._coeffs = self.reduce_vals_with_buffer(self._buffer, self._coeffs,tmpF,tmpM,tmpS)        
+        #self._coeffs = np.copy(self._npy)
+        #self.create_coeffs(self._F,self._M,self._S)
         
     def reduce_vals_with_buffer(self,buffer, mynpy,tmpF,tmpM,tmpS):
-        smnpy = np.zeros(self._npy.shape)
+        smnpy = np.zeros((self._F,self._M,self._S))
         for z in range(self._S):            
             for y in range(self._M):                
                 for x in range(self._F):                    
                     u_x, u_y, u_z = x+buffer,y+buffer,z+buffer
                     val = mynpy[u_x,u_y,u_z]
                     smnpy[x,y,z] = val
-            return smnpy
+        return smnpy
         
     def extend_vals_with_buffer(self,buffer):        
         #// 1. Make a buffer padded values cube for periodic values        
@@ -497,7 +497,7 @@ class Bspline(Interpolator):
         self._coeffs[x,y,z] = v
 
     def get_value(self, x, y, z):        
-        u_x, u_y, u_z = self.get_adjusted_fms(x,y,z)                                    
+        u_x, u_y, u_z = self.get_adjusted_fms(x,y,z)
         weight_length = self.degree + 1
         xIndex, yIndex, zIndex = [],[],[]        
         xWeight, yWeight,zWeight = [],[],[]        
@@ -509,9 +509,9 @@ class Bspline(Interpolator):
             yWeight.append(0)
             zWeight.append(0)            
         #Compute the interpolation indices
-        i = int(math.floor(x) - self.degree / 2)
-        j = int(math.floor(y) - self.degree / 2)
-        k = int(math.floor(z) - self.degree / 2)
+        i = int(math.floor(u_x) - self.degree / 2)
+        j = int(math.floor(u_y) - self.degree / 2)
+        k = int(math.floor(u_z) - self.degree / 2)
 
         for l in range(self.degree+1):        
             i,j,k=i+1,j+1,k+1        
@@ -520,21 +520,21 @@ class Bspline(Interpolator):
             zIndex[l] = k            
         #/* compute the interpolation weights */
         if (self.degree == 9):        
-            xWeight = self.applyValue9(x, xIndex, weight_length)
-            yWeight = self.applyValue9(y, yIndex, weight_length)
-            zWeight = self.applyValue9(z, zIndex, weight_length)        
+            xWeight = self.applyValue9(u_x, xIndex, weight_length)
+            yWeight = self.applyValue9(u_y, yIndex, weight_length)
+            zWeight = self.applyValue9(u_z, zIndex, weight_length)        
         elif (self.degree == 7):        
-            xWeight = self.applyValue7(x, xIndex, weight_length)
-            yWeight = self.applyValue7(y, yIndex, weight_length)
-            zWeight = self.applyValue7(z, zIndex, weight_length)        
+            xWeight = self.applyValue7(u_x, xIndex, weight_length)
+            yWeight = self.applyValue7(u_y, yIndex, weight_length)
+            zWeight = self.applyValue7(u_z, zIndex, weight_length)        
         elif (self.degree == 5):        
-            xWeight = self.applyValue5(x, xIndex, weight_length)
-            yWeight = self.applyValue5(y, yIndex, weight_length)
-            zWeight = self.applyValue5(z, zIndex, weight_length)        
+            xWeight = self.applyValue5(u_x, xIndex, weight_length)
+            yWeight = self.applyValue5(u_y, yIndex, weight_length)
+            zWeight = self.applyValue5(u_z, zIndex, weight_length)        
         else:        
-            xWeight = self.applyValue3(x, xIndex, weight_length)
-            yWeight = self.applyValue3(y, yIndex, weight_length)
-            zWeight = self.applyValue3(z, zIndex, weight_length)        
+            xWeight = self.applyValue3(u_x, xIndex, weight_length)
+            yWeight = self.applyValue3(u_y, yIndex, weight_length)
+            zWeight = self.applyValue3(u_z, zIndex, weight_length)        
         #//applying the mirror boundary condition becaue I am only interpolating within values??
         #// RSA edit actually I want to wrap        
         # !!! I have removed the mirror boundary bit, might need to put it back in RSA TODO         

@@ -50,6 +50,9 @@ def query_pdb():
         print("return xyz",c1_xyz.get_key())
 
         # some known values
+        print("Crs (50,50,50)",mf.interper.get_value(50,50,50))
+        print("Crs (0,0.1,-0.1)",mf.interper.get_value(0,0.1,-0.1))
+        print("Crs (-1,-1.5,-1)",mf.interper.get_value(-1,-1.5,-1))
         print("Crs (10,5,12)",mf.interper.get_value(10,5,12))
         print("Crs (10.5,5.5,12.5)",mf.interper.get_value(10.5,5.5,12.5))        
         print("Crs (29.0584,7.6586,51.7109)",mf.interper.get_value(29.0584,7.6586,51.7109))
