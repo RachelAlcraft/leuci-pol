@@ -509,15 +509,15 @@ class Bspline(Interpolator):
             yWeight.append(0)
             zWeight.append(0)            
         #Compute the interpolation indices
-        i = int(math.floor(u_x) - self.degree / 2)
-        j = int(math.floor(u_y) - self.degree / 2)
-        k = int(math.floor(u_z) - self.degree / 2)
+        i = int(math.floor(u_x) - math.floor(self.degree / 2))
+        j = int(math.floor(u_y) - math.floor(self.degree / 2))
+        k = int(math.floor(u_z) - math.floor(self.degree / 2))
 
-        for l in range(self.degree+1):        
-            i,j,k=i+1,j+1,k+1        
+        for l in range(self.degree+1):                          
             xIndex[l] = i #if 71.1 passed in, for linear, we would want 71 and 72, 
             yIndex[l] = j
-            zIndex[l] = k            
+            zIndex[l] = k
+            i,j,k=i+1,j+1,k+1              
         #/* compute the interpolation weights */
         if (self.degree == 9):        
             xWeight = self.applyValue9(u_x, xIndex, weight_length)
