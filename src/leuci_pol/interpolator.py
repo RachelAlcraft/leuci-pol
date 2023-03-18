@@ -6,17 +6,28 @@ from abc import ABC, abstractmethod
 from leuci_xyz import vectorthree as v3
 import math
 import numpy as np
-from . import invariant as ivm
+
+#from . import invariant as ivm
+from . import iv1
+from . import iv3
+from . import iv5
+
+
+
 
 ### Factory method for creation ##############################################################
-def create_interpolator(method, values, F, M, S, npy=None,degree=0, log_level=0):
+def create_interpolator(method, values, F, M, S, npy=None,degree=-1, log_level=0):
     if log_level > 0:
-        print("Interpolator:",method,F,M,S)
+        print("Interpolator:",method,F,M,S,"degree=",degree)
     intr = None
     if method == "linear":
         intr = Multivariate(values,F, M, S,npy, 1, log_level)
+    elif method == "cubic" and degree == 5: #not really cubic, but quintic
+        intr = Multivariate(values,F, M, S,npy, 5, log_level)
     elif method == "cubic":
         intr = Multivariate(values,F, M, S,npy, 3, log_level)
+    elif method == "bspline" and degree == 5:
+        intr = Bspline(values,F, M, S,npy, 5, log_level) # I am being cautious about degrees
     elif method == "bspline":
         intr = Bspline(values,F, M, S,npy, 3, log_level) 
     else: #nearest is default
@@ -26,7 +37,8 @@ def create_interpolator(method, values, F, M, S, npy=None,degree=0, log_level=0)
 
 ### Abstract class ############################################################################
 class Interpolator(ABC):
-    def __init__(self, values, F, M, S, npy=None,degree=0,log_level=0):
+    def __init__(self, values, F, M, S, npy=None,degree=-1,log_level=0):
+        self.use_jax = False                
         if npy != None:
             self._npy = npy
         else:
@@ -43,20 +55,31 @@ class Interpolator(ABC):
         self.degree = degree
         self._buffer = 28
         self.log_level = log_level         
-        self.h = 0.00001 #this is the iunterval for numerical differentiation
+        self.h = 0.1 #this is the interval for numerical differentiation
+        
                 
     @abstractmethod
     def get_value(self, x, y, z):
         pass
 
     # implemented interface that is the same for all abstractions
-    def get_radient(self, x, y, z):        
-        val = self.get_value(x, y, z)
-        dx = (self.get_value(x + self.h, y, z) - val) / self.h
-        dy = (self.get_value(x, y + self.h, z) - val) / self.h
-        dz = (self.get_value(x, y, z + self.h) - val) / self.h
-        radient = (abs(dx) + abs(dy) + abs(dz)) / 3
-        return radient
+    def get_radient(self, x, y, z):                
+        if self.use_jax:
+            grad_radx = grad(self.get_value,argnums=0)(x,y,z)
+            grad_rady = grad(self.get_value,argnums=1)(x,y,z)
+            grad_radz = grad(self.get_value,argnums=2)(x,y,z)
+            dx = grad_radx(x,y,z)
+            dy = grad_rady(x,y,z)
+            dz = grad_radz(x,y,z)
+            radient = (abs(dx) + abs(dy) + abs(dz)) / 3
+            return radient
+        else:
+            val = self.get_value(x, y, z)
+            dx = (self.get_value(x + self.h, y, z) - val) / self.h
+            dy = (self.get_value(x, y + self.h, z) - val) / self.h
+            dz = (self.get_value(x, y, z + self.h) - val) / self.h
+            radient = (abs(dx) + abs(dy) + abs(dz)) / 3
+            return radient
         
     def get_laplacian(self, x, y, z):        
         val = self.get_value(x, y, z)
@@ -85,10 +108,26 @@ class Interpolator(ABC):
                 
     def get_fms(self,f,m,s,F=-1,M=-1,S=-1):        
         u_f, u_m, u_s = self.get_adjusted_fms(f,m,s,F,M,S)
-        return self._npy[u_f,u_m,u_s]
+        return self._npy[int(u_f),int(u_m),int(u_s)]
         #pos = self.get_pos_from_fms(u_f,u_m,u_s,F,M,S)
         #return self._values[pos]
     
+    def get_projection(self,slice):        
+        if slice == "xy":        
+            return self._npy.max(axis=(2))
+        elif slice == "yz":        
+            return self._npy.max(axis=(0))
+        elif slice == "zx":        
+            return self._npy.max(axis=(1))
+    
+    def get_cross_section(self,slice,layer):        
+        if slice == "xy":        
+            return self._npy[:,:,layer]
+        elif slice == "yz":        
+            return self._npy[layer,:,:]            
+        elif slice == "zx":        
+            return self._npy[:,layer,:]
+            
     def get_pos_from_fms(self, f, m, s,F=-1,M=-1,S=-1):
         use_f,use_m,use_s = self._F, self._M, self._S
         if F+M+S != -3:
@@ -151,9 +190,9 @@ class Interpolator(ABC):
     
     def corners(self,point, far=1):
         cnrs = []        
-        x = math.ceil(point.A)
-        y = math.ceil(point.B)
-        z = math.ceil(point.C)
+        x = np.ceil(point.A)
+        y = np.ceil(point.B)
+        z = np.ceil(point.C)
         for f in range(0-far,far):
             for m in range(0-far,far):
                 for s in range(0-far,far):
@@ -183,11 +222,11 @@ class Interpolator(ABC):
         vals = []            
         xp,yp,zp = 0,0,0 
         for i in range(int(-1*width/2 + 1), int(width/2 + 1)):
-            xp = math.floor(x + i)
+            xp = np.floor(x + i)
             for j in range(int(-1*width/2 + 1), int(width/2 + 1)):      
-                yp = math.floor(y + j)
+                yp = np.floor(y + j)
                 for k in range(int(-1*width/2 + 1), int(width/2 + 1)):          
-                    zp = math.floor(z + k)                        
+                    zp = np.floor(z + k)                        
                     p = self.get_fms(xp, yp, zp)
                     vals.append(p)                    
         npvals = np.array(vals)    
@@ -220,28 +259,37 @@ class Nearest(Interpolator):
     def get_value(self, x, y, z):
         closest_pnt = self.closest(v3.VectorThree(x,y,z))  
         #print(closest_pnt.A, closest_pnt.B,closest_pnt.C)      
-        return self.get_fms(closest_pnt.A, closest_pnt.B,closest_pnt.C)
+        return self.get_fms(closest_pnt.A, closest_pnt.B,closest_pnt.C)    
 ####################################################################################################
 ### Multivariate - Linear and Cubic
 ####################################################################################################
 class Multivariate(Interpolator):                
     def init(self):
         self.points = self.degree + 1
-        self.dimsize = math.pow(self.points, 3)
-        self.inv = ivm.InvariantVandermonde(self.degree)
+        if self.use_jax:
+            self.dimsize = np.power(self.points, 3)
+        else:
+            self.dimsize = math.pow(self.points, 3)
+        if self.degree == 1:
+            self.inv = iv1.InvariantVandermonde()
+        elif self.degree == 3:
+            self.inv = iv3.InvariantVandermonde()
+        elif self.degree == 5:
+            self.inv = iv5.InvariantVandermonde()
         self.need_new = True
         self._xfloor = -1
         self._yfloor = -1
         self._zfloor = -1
+    
     def get_value(self, x, y, z):
         # The method of linear interpolation is a version of my own method for multivariate fitting, instead of trilinear interpolation
         # NOTE I could extend this to be multivariate not linear but it has no advantage over bspline - and is slower and not as good 
         # Document is here: https://rachelalcraft.github.io/Papers/MultivariateInterpolation/MultivariateInterpolation.pdf                        
         recalc = self.need_new
         #we can reuse our last matrix if the points are within the same unit cube
-        xFloor = math.floor(x)
-        yFloor = math.floor(y)
-        zFloor = math.floor(z)
+        xFloor = np.floor(x)
+        yFloor = np.floor(y)
+        zFloor = np.floor(z)
         if not recalc:
             if (xFloor != self.xfloor):
                 recalc = True
@@ -251,9 +299,9 @@ class Multivariate(Interpolator):
                 recalc = True
 
         if (recalc):        
-            self.xfloor = math.floor(x)
-            self.yfloor = math.floor(y)
-            self.zfloor = math.floor(z)
+            self.xfloor = np.floor(x)
+            self.yfloor = np.floor(y)
+            self.zfloor = np.floor(z)
             # 1. Build the points around the centre as a cube - 8 points
             vals = self.build_cube_around(x, y, z, self.points)
             #2. Multiply with the precomputed matrix to find the multivariate polynomial
@@ -269,14 +317,14 @@ class Multivariate(Interpolator):
             self.need_new = False        
         #4. Adjust the values to be within this cube
         pstart = (-1 * self.points / 2) + 1        
-        xn = x - math.floor(x) - pstart
-        yn = y - math.floor(y) - pstart
-        zn = z - math.floor(z) - pstart
+        xn = x - np.floor(x) - pstart
+        yn = y - np.floor(y) - pstart
+        zn = z - np.floor(z) - pstart
 
         #5. Apply the multivariate polynomial coefficents to find the value
         #return self.get_value_multivariate(zn, yn, xn, self.polyCoeffs)
         return self.get_value_multivariate(zn, yn, xn, self.polyCoeffs)
-
+        
     def get_value_multivariate(self, x, y, z, coeffs):        
         #This is using a value scheme that makes sens of our new fitted polyCube
         #In a linear case it will be a decimal between 0 and 1          
@@ -286,7 +334,7 @@ class Multivariate(Interpolator):
             for j in range(jj):            
                 for k in range(kk):                
                     coeff = coeffs[i, j, k];                    
-                    val = coeff * math.pow(z, i) * math.pow(y, j) * math.pow(x, k)
+                    val = coeff * np.power(z, i) * np.power(y, j) * np.power(x, k)
                     value = value + val                                    
         return value
             
@@ -376,10 +424,10 @@ class Bspline(Interpolator):
             pole.append(-0.12255461519232669051527226435935734360548654942730)
             pole.append(-0.0091486948096082769285930216516478534156925639545994)
         elif (degree == 5):        
-            pole.append(math.sqrt(135.0 / 2.0 - math.sqrt(17745.0 / 4.0)) + math.sqrt(105.0 / 4.0) - 13.0 / 2.0)
-            pole.append(math.sqrt(135.0 / 2.0 + math.sqrt(17745.0 / 4.0)) - math.sqrt(105.0 / 4.0) - 13.0 / 2.0)
+            pole.append(np.sqrt(135.0 / 2.0 - np.sqrt(17745.0 / 4.0)) + np.sqrt(105.0 / 4.0) - 13.0 / 2.0)
+            pole.append(np.sqrt(135.0 / 2.0 + np.sqrt(17745.0 / 4.0)) - np.sqrt(105.0 / 4.0) - 13.0 / 2.0)
         else:#then it is 3        
-            pole.append(math.sqrt(3.0) - 2.0)
+            pole.append(np.sqrt(3.0) - 2.0)
         return pole
 
     def get_row3d(self,y,z,length,F,M,S):        
@@ -454,12 +502,12 @@ class Bspline(Interpolator):
         #/* this initialization corresponds to mirror boundaries */
         Horizon = length
         if (self.TOLERANCE > 0.0):        
-            Horizon = math.ceil(math.log(self.TOLERANCE) / math.log(abs(pole)))
+            Horizon = np.ceil(np.log(self.TOLERANCE) / np.log(abs(pole)))
         if (Horizon < length):        
             #/* accelerated loop */
             zn = pole
             Sum = vals[0]
-            for n in range(1,Horizon):            
+            for n in range(1,int(Horizon)):
                 Sum += zn * vals[n]
                 zn *= pole       
             return Sum        
@@ -468,7 +516,7 @@ class Bspline(Interpolator):
             #/* full loop */
             zn = pole
             iz = 1.0 / pole
-            z2n = math.pow(pole, length - 1)
+            z2n = np.pow(pole, length - 1)
             Sum = vals[0] + z2n * vals[length - 1]
             z2n *= z2n * iz 
             for n in range(1,length - 2):
@@ -509,9 +557,9 @@ class Bspline(Interpolator):
             yWeight.append(0)
             zWeight.append(0)            
         #Compute the interpolation indices
-        i = int(math.floor(u_x) - math.floor(self.degree / 2))
-        j = int(math.floor(u_y) - math.floor(self.degree / 2))
-        k = int(math.floor(u_z) - math.floor(self.degree / 2))
+        i = int(np.floor(u_x) - np.floor(self.degree / 2))
+        j = int(np.floor(u_y) - np.floor(self.degree / 2))
+        k = int(np.floor(u_z) - np.floor(self.degree / 2))
 
         for l in range(self.degree+1):                          
             xIndex[l] = i #if 71.1 passed in, for linear, we would want 71 and 72, 
@@ -550,7 +598,7 @@ class Bspline(Interpolator):
                 w2 += yWeight[j] * w1
             w3 += zWeight[k] * w2
         return w3
-
+    
     def applyValue3(self,val, idc, weight_length):        
         ws = []
         for i in range(weight_length):

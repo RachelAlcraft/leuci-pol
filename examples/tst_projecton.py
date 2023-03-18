@@ -32,17 +32,14 @@ method="nearest"
 def nearest_slice():
     print("Checking simple nearest slice")
     # the 3d data is in a list of values, with the fastest changing axis first, called F, M, S (fast, medium, slow)        
-    itrp = pol.create_interpolator(method,vals,F=f,M=m,S=s,log_level=1, degree=3)
-    spc = space.SpaceTransform(central, linear, planar)
-    gm = grid.GridMaker()    
-    u_coords = gm.get_unit_grid(width,samples)        
-    xyz_coords = spc.get_coords(u_coords)    
-    sl_vals = itrp.get_val_slice(xyz_coords)
-    sl_rads = itrp.get_val_slice(xyz_coords,deriv=1)
-    sl_laps = itrp.get_val_slice(xyz_coords,deriv=2)
-    print("Values", sl_vals)
-    print("Radient", sl_rads)
-    print("Laplacian", sl_laps)
+    itrp = pol.create_interpolator(method,vals,F=f,M=m,S=s,log_level=1)                
+    valsxy = itrp.get_projection("xy")
+    print("xy", valsxy)
+    valsyz = itrp.get_projection("yz")
+    print("yz", valsyz)
+    valszx = itrp.get_projection("zx")            
+    print("zx", valszx)
+    
     
                         
 nearest_slice()

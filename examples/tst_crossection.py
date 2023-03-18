@@ -21,28 +21,22 @@ from leuci_xyz import spacetransform as space
 ########## INPUTS #################
 vals = [1,2,3,4,5,6,7,8]
 f,m,s = 2,2,2    
-central = v3.VectorThree(1,1,1)
-linear = v3.VectorThree(1,1,0)
-planar = v3.VectorThree(0,0,0)
-width=2
-samples=5
 method="nearest"
 
 ########## EXAMPLE #################
 def nearest_slice():
     print("Checking simple nearest slice")
     # the 3d data is in a list of values, with the fastest changing axis first, called F, M, S (fast, medium, slow)        
-    itrp = pol.create_interpolator(method,vals,F=f,M=m,S=s,log_level=1, degree=3)
-    spc = space.SpaceTransform(central, linear, planar)
-    gm = grid.GridMaker()    
-    u_coords = gm.get_unit_grid(width,samples)        
-    xyz_coords = spc.get_coords(u_coords)    
-    sl_vals = itrp.get_val_slice(xyz_coords)
-    sl_rads = itrp.get_val_slice(xyz_coords,deriv=1)
-    sl_laps = itrp.get_val_slice(xyz_coords,deriv=2)
-    print("Values", sl_vals)
-    print("Radient", sl_rads)
-    print("Laplacian", sl_laps)
+    itrp = pol.create_interpolator(method,vals,F=f,M=m,S=s,log_level=1)                
+    valsxy1 = itrp.get_cross_section("xy",0)
+    valsxy2 = itrp.get_cross_section("xy",1)
+    print("xy1", valsxy1)
+    print("xy2", valsxy2)
+    valsyz = itrp.get_cross_section("xy",0)
+    print("yz", valsyz)
+    valszx = itrp.get_cross_section("xy",0)        
+    print("zx", valszx)
+    
     
                         
 nearest_slice()

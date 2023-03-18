@@ -7,9 +7,7 @@ import numpy as np
 class InvariantVandermonde(object):
     def __init__(self, degree):        
         if degree == 3:
-            self.make3()
-        #elif degree == 5:
-        #    self.make5()
+            self.make3()        
         else: #defau;t to linear
             self.make1()
                 

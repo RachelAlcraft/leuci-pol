@@ -6,9 +6,10 @@ Using WSL the show() functions creates an html page on localhost
 
 """
 ################### USER INPUTS #######################
-which_examples = [0] # could be 0-5
+which_examples = [1] # could be 0-5
 width = 8           # in angstrom
 samples = 100       # number of sample points along each axis to interpolate
+degree = 5
 ########### A description of the examples #############
 examples = []
 #2abcd, negative density in NOS switch
@@ -17,6 +18,13 @@ examples.append(["Fig01-cubic_v_spline","3u7z",
                   [("density",2,-1,0.8,0.5,(1,1),"RGB","bspline"),("density",2,-1,0.8,0.5,(1,2),"RGB","cubic")],                  
                   (1,2),
                   ("cubic","spline")])
+
+examples.append(["Fig01-em_6axz","6axz",
+                  ["(-0.919,-1.242,7.415)","(-1.53,-2.311,6.507)","(0.261,-0.895,7.258)"],
+                  [("density",2,-1,0.8,0.5,(1,1),"RGB","cubic"),("radient",2,-1,0.8,0.8,(1,2),"BW","cubic"),("laplacian",1,0,0.8,0.5,(1,3),"RB","cubic"),
+                  ("density",2,-1,0.8,0.5,(2,1),"RGB","bspline"),("radient",2,-1,0.8,0.8,(2,2),"BW","bspline"),("laplacian",1,0,0.8,0.5,(2,3),"RB","bspline")],
+                  (2,3),
+                  ("density","radient","laplacian","density","radient","laplacian")])       #0
 
 
 
@@ -109,16 +117,16 @@ for which_example in which_examples:
   
   for deriv,fo,fc,min_per,max_per, plot_pos,hue,interp_method in plots:
     print("Plot details=",deriv,fo,fc,min_per,max_per)    
-    mf = mfun.MapFunctions(pdb_code,ml.mobj,ml.pobj,interp_method)      
+    mf = mfun.MapFunctions(pdb_code,ml.mobj,ml.pobj,interp_method,degree=degree)
     loadeds[pdb_code] = mf
 
     vals = [[]]
     if deriv == "density":    
-      vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=0,fo=fo,fc=fc)
+      vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=0,fo=fo,fc=fc,degree=degree)
     elif deriv == "radient":
-      vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=1,fo=fo,fc=fc)
+      vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=1,fo=fo,fc=fc,degree=degree)
     elif deriv == "laplacian":
-      vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=2,fo=fo,fc=fc)
+      vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=2,fo=fo,fc=fc,degree=degree)
     ###############################################################################    
     # Showing the plots in plotly
     # reference: https://plotly.com/python/contour-plots/
@@ -168,7 +176,7 @@ for which_example in which_examples:
   rows, cols =plot_config[0],plot_config[1]
   wdth = 2000
   hight = int(wdth * rows/cols)
-  fig.write_image(EG_DIR +"eg001_eg_" + plotid + ".jpg",width=wdth,height=hight)
-  print("#### Created image at", EG_DIR +"eg001_eg_" + plotid + ".jpg ####")
+  fig.write_image(EG_DIR +"eg001_eg_" + plotid + str(degree) + ".jpg",width=wdth,height=hight)
+  print("#### Created image at", EG_DIR +"eg001_eg_" + plotid +str(degree)+ ".jpg ####")
   dt2 = datetime.datetime.now()
   print("completed in", dt2-dt1)
