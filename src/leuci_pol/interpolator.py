@@ -37,8 +37,7 @@ def create_interpolator(method, values, F, M, S, npy=None,degree=-1, log_level=0
 
 ### Abstract class ############################################################################
 class Interpolator(ABC):
-    def __init__(self, values, F, M, S, npy=None,degree=-1,log_level=0):
-        self.use_jax = False                
+    def __init__(self, values, F, M, S, npy=None,degree=-1,log_level=0):                     
         if npy != None:
             self._npy = npy
         else:
@@ -55,52 +54,50 @@ class Interpolator(ABC):
         self.degree = degree
         self._buffer = 28
         self.log_level = log_level         
-        self.h = 0.1 #this is the interval for numerical differentiation
-        
-                
+        self.h = 0.01 #this is the interval for numerical differentiation
+    ############################################################################################################            
     @abstractmethod
     def get_value(self, x, y, z):
         pass
+    
+    @abstractmethod
+    def get_radient(self, x, y, z):
+        pass
+    
+    @abstractmethod
+    def get_laplacian(self, x, y, z):
+        pass
+    ############################################################################################################
 
     # implemented interface that is the same for all abstractions
-    def get_radient(self, x, y, z):                
-        if self.use_jax:
-            grad_radx = grad(self.get_value,argnums=0)(x,y,z)
-            grad_rady = grad(self.get_value,argnums=1)(x,y,z)
-            grad_radz = grad(self.get_value,argnums=2)(x,y,z)
-            dx = grad_radx(x,y,z)
-            dy = grad_rady(x,y,z)
-            dz = grad_radz(x,y,z)
-            radient = (abs(dx) + abs(dy) + abs(dz)) / 3
-            return radient
-        else:
-            val = self.get_value(x, y, z)
-            dx = (self.get_value(x + self.h, y, z) - val) / self.h
-            dy = (self.get_value(x, y + self.h, z) - val) / self.h
-            dz = (self.get_value(x, y, z + self.h) - val) / self.h
-            radient = (abs(dx) + abs(dy) + abs(dz)) / 3
-            return radient
-        
-    def get_laplacian(self, x, y, z):        
+    def get_radient_numerical(self, x, y, z):                        
         val = self.get_value(x, y, z)
-        xx = self.getDxDx(x, y, z, val)
-        yy = self.getDyDy(x, y, z, val)
-        zz = self.getDzDz(x, y, z, val)
+        dx = (self.get_value(x + self.h, y, z) - val) / self.h
+        dy = (self.get_value(x, y + self.h, z) - val) / self.h
+        dz = (self.get_value(x, y, z + self.h) - val) / self.h
+        radient = (abs(dx) + abs(dy) + abs(dz)) / 3
+        return radient
+        
+    def get_laplacian_numerical(self, x, y, z):        
+        val = self.get_value(x, y, z)
+        xx = self.getDxDx_numerical(x, y, z, val)
+        yy = self.getDyDy_numerical(x, y, z, val)
+        zz = self.getDzDz_numerical(x, y, z, val)
         return xx + yy + zz 
         
-    def getDxDx(self, x, y, z, val):        
+    def getDxDx_numerical(self, x, y, z, val):        
         va = self.get_value(x - self.h, y, z)
         vb = self.get_value(x + self.h, y, z)
         dd = (va + vb - 2 * val) / (self.h * self.h)
         return dd
         
-    def getDyDy(self, x, y, z, val):        
+    def getDyDy_numerical(self, x, y, z, val):        
         va = self.get_value(x, y - self.h, z)
         vb = self.get_value(x, y + self.h, z)
         dd = (va + vb - 2 * val) / (self.h * self.h)
         return dd
         
-    def getDzDz(self, x, y, z, val):        
+    def getDzDz_numerical(self, x, y, z, val):        
         va = self.get_value(x, y, z - self.h)
         vb = self.get_value(x, y, z + self.h)
         dd = (va + vb - 2 * val) / (self.h * self.h)
@@ -260,16 +257,20 @@ class Nearest(Interpolator):
         closest_pnt = self.closest(v3.VectorThree(x,y,z))  
         #print(closest_pnt.A, closest_pnt.B,closest_pnt.C)      
         return self.get_fms(closest_pnt.A, closest_pnt.B,closest_pnt.C)    
+    ## implement abstract interface #########################################
+    def get_radient(self, x, y, z):
+        return self.get_radient_numerical(x,y,z)
+    
+    def get_laplacian(self, x, y, z):
+        return self.get_laplacian_numerical(x,y,z)
+    ## iplement abstract interface ###########################################
 ####################################################################################################
 ### Multivariate - Linear and Cubic
 ####################################################################################################
 class Multivariate(Interpolator):                
     def init(self):
-        self.points = self.degree + 1
-        if self.use_jax:
-            self.dimsize = np.power(self.points, 3)
-        else:
-            self.dimsize = math.pow(self.points, 3)
+        self.points = self.degree + 1        
+        self.dimsize = math.pow(self.points, 3)
         if self.degree == 1:
             self.inv = iv1.InvariantVandermonde()
         elif self.degree == 3:
@@ -281,6 +282,14 @@ class Multivariate(Interpolator):
         self._yfloor = -1
         self._zfloor = -1
     
+    ## implement abstract interface #########################################
+    def get_radient(self, x, y, z):
+        return self.get_radient_numerical(x,y,z)
+    
+    def get_laplacian(self, x, y, z):
+        return self.get_laplacian_numerical(x,y,z)
+    ## iplement abstract interface ###########################################
+
     def get_value(self, x, y, z):
         # The method of linear interpolation is a version of my own method for multivariate fitting, instead of trilinear interpolation
         # NOTE I could extend this to be multivariate not linear but it has no advantage over bspline - and is slower and not as good 
@@ -353,6 +362,14 @@ class Bspline(Interpolator):
         self.mirror = False                
         self.make_periodic_coeffs() #temp make it just ordinary coeffs
             
+    ## implement abstract interface #########################################
+    def get_radient(self, x, y, z):
+        return self.get_radient_numerical(x,y,z)
+    
+    def get_laplacian(self, x, y, z):
+        return self.get_laplacian_numerical(x,y,z)
+    ## iplement abstract interface ###########################################
+
     def make_periodic_coeffs(self):           
         # we make the coefficients matrix a bit bigger than the vaues and have it wrap, and then cut it back down to the values                 
         self._coeffs =self.extend_vals_with_buffer(self._buffer)

@@ -16,7 +16,7 @@ from leuci_xyz import vectorthree as v3
 
 ########## INPUTS #################
 #test_methods = ["nearest","linear","cubic"]
-test_methods = ["cubic","bspline"]
+test_methods = ["nearest","linear","cubic","bspline"]
 full_test = False
 
 ########## EXAMPLE #################

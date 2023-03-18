@@ -6,10 +6,10 @@ Using WSL the show() functions creates an html page on localhost
 
 """
 ################### USER INPUTS #######################
-which_examples = [1] # could be 0-5
+which_examples = [2,3] # could be 0-5
 width = 8           # in angstrom
-samples = 100       # number of sample points along each axis to interpolate
-degree = 5
+samples = 50       # number of sample points along each axis to interpolate
+degree = 3
 ########### A description of the examples #############
 examples = []
 #2abcd, negative density in NOS switch
@@ -19,12 +19,24 @@ examples.append(["Fig01-cubic_v_spline","3u7z",
                   (1,2),
                   ("cubic","spline")])
 
-examples.append(["Fig01-em_6axz","6axz",
+examples.append(["Fig02-em_6axz","6axz",
                   ["(-0.919,-1.242,7.415)","(-1.53,-2.311,6.507)","(0.261,-0.895,7.258)"],
                   [("density",2,-1,0.8,0.5,(1,1),"RGB","cubic"),("radient",2,-1,0.8,0.8,(1,2),"BW","cubic"),("laplacian",1,0,0.8,0.5,(1,3),"RB","cubic"),
                   ("density",2,-1,0.8,0.5,(2,1),"RGB","bspline"),("radient",2,-1,0.8,0.8,(2,2),"BW","bspline"),("laplacian",1,0,0.8,0.5,(2,3),"RB","bspline")],
                   (2,3),
                   ("density","radient","laplacian","density","radient","laplacian")])       #0
+
+examples.append(["Fig03-em_6eex_cubic","6eex",
+                  ["(3.638,8.536,8.108)","(2.894,9.166,9.274)","(4.849,8.296,8.176)"],
+                  [("density",2,-1,0.9,0.5,(1,1),"RGB","cubic"),("radient",2,-1,1.0,1.0,(1,2),"BW","cubic"),("laplacian",1,0,0.9,0.9,(1,3),"RB","cubic")],
+                  (1,3),
+                  ("density","radient","laplacian")])       #2
+
+examples.append(["Fig03-em_6eex_bspline","6eex",
+                  ["(3.638,8.536,8.108)","(2.894,9.166,9.274)","(4.849,8.296,8.176)"],
+                  [("density",2,-1,0.9,0.5,(1,1),"RGB","bspline"),("radient",2,-1,1.0,1.0,(1,2),"BW","bspline"),("laplacian",1,0,0.9,0.9,(1,3),"RB","bspline")],
+                  (1,3),
+                  ("density","radient","laplacian")])       #3
 
 
 
@@ -115,11 +127,10 @@ for which_example in which_examples:
     fig = make_subplots(rows=plot_config[0], cols=plot_config[1],subplot_titles=(names),horizontal_spacing=0.05,vertical_spacing=0.05)
   
   
-  for deriv,fo,fc,min_per,max_per, plot_pos,hue,interp_method in plots:
-    print("Plot details=",deriv,fo,fc,min_per,max_per)    
-    mf = mfun.MapFunctions(pdb_code,ml.mobj,ml.pobj,interp_method,degree=degree)
+  mf = mfun.MapFunctions(pdb_code,ml.mobj,ml.pobj,"linear",degree=degree)
+  for deriv,fo,fc,min_per,max_per, plot_pos,hue,interp_method in plots:    
+    print("Plot details=",deriv,fo,fc,min_per,max_per)        
     loadeds[pdb_code] = mf
-
     vals = [[]]
     if deriv == "density":    
       vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=0,fo=fo,fc=fc,degree=degree)
@@ -127,10 +138,10 @@ for which_example in which_examples:
       vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=1,fo=fo,fc=fc,degree=degree)
     elif deriv == "laplacian":
       vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=2,fo=fo,fc=fc,degree=degree)
-    ###############################################################################    
+    ###############################################################################
     # Showing the plots in plotly
     # reference: https://plotly.com/python/contour-plots/
-    ###############################################################################    
+    ###############################################################################
     # mins and maxes for colors
     mind,maxd = 1000,-1000    
     for i in range(len(vals)):
@@ -151,10 +162,12 @@ for which_example in which_examples:
     
     data_scatter = go.Scatter(x=scatterX,y=scatterY,mode="markers",marker=dict(color="yellow",size=5),showlegend=False)
     
-    if hue == "BW":
+    if hue == "WB":
       data_vals = go.Heatmap(z=vals,colorscale=['White','Black'],showscale=False,zmin=absmin,zmax=absmax)
+    elif hue == "BW":
+      data_vals = go.Heatmap(z=vals,colorscale=['Black','Snow'],showscale=False,zmin=absmin,zmax=absmax)
     elif hue == "RB":
-      data_vals = go.Contour(z=vals,showscale=False,
+      data_vals = go.Contour(z=vals,showscale=True,
                             colorscale=[(0, "rgb(100,0,0)"),(0.1, "crimson"), (d0, "silver"), (0.9, "blue"),(1, "navy")],
                             contours=dict(start=absmin,end=absmax,size=(absmax-absmin)/20),
                             line=dict(width=0.5,color="darkgray"),
