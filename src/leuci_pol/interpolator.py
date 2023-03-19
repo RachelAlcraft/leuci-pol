@@ -283,14 +283,29 @@ class Multivariate(Interpolator):
         self._zfloor = -1
     
     ## implement abstract interface #########################################
+    def get_value(self, x, y, z):
+        return self.get_value_new(x,y,z)
+
     def get_radient(self, x, y, z):
-        return self.get_radient_numerical(x,y,z)
+        xn,yn,zn,coeffs = self.make_coeffs(x,y,z)
+        dx = self.get_value_multivariate(zn, yn, xn, coeffs,["x"])
+        dy = self.get_value_multivariate(zn, yn, xn, coeffs,["y"])
+        dz = self.get_value_multivariate(zn, yn, xn, coeffs,["z"])
+        return (abs(dx) + abs(dy) + abs(dz))/3
     
     def get_laplacian(self, x, y, z):
-        return self.get_laplacian_numerical(x,y,z)
+        xn,yn,zn,coeffs = self.make_coeffs(x,y,z)
+        ddx = self.get_value_multivariate(zn, yn, xn, coeffs,["x","x"])
+        ddy = self.get_value_multivariate(zn, yn, xn, coeffs,["y","y"])
+        ddz = self.get_value_multivariate(zn, yn, xn, coeffs,["z","z"])
+        return ddx+ddy+ddz
     ## iplement abstract interface ###########################################
 
-    def get_value(self, x, y, z):
+    def get_value_new(self, x, y, z):
+        xn,yn,zn,coeffs = self.make_coeffs(x,y,z)
+        return self.get_value_multivariate(zn, yn, xn, coeffs)
+
+    def get_value_old(self, x, y, z):
         # The method of linear interpolation is a version of my own method for multivariate fitting, instead of trilinear interpolation
         # NOTE I could extend this to be multivariate not linear but it has no advantage over bspline - and is slower and not as good 
         # Document is here: https://rachelalcraft.github.io/Papers/MultivariateInterpolation/MultivariateInterpolation.pdf                        
@@ -334,18 +349,74 @@ class Multivariate(Interpolator):
         #return self.get_value_multivariate(zn, yn, xn, self.polyCoeffs)
         return self.get_value_multivariate(zn, yn, xn, self.polyCoeffs)
         
-    def get_value_multivariate(self, x, y, z, coeffs):        
+    def get_value_multivariate(self, x, y, z, coeffs,wrt=[]):        
         #This is using a value scheme that makes sens of our new fitted polyCube
         #In a linear case it will be a decimal between 0 and 1          
+        calc_mat = coeffs
+        for partial in wrt:
+            if partial == "x":
+                calc_mat = self.diffWRTx(calc_mat)
+            elif partial == "y":
+                calc_mat = self.diffWRTy(calc_mat)
+            elif partial == "z":
+                calc_mat = self.diffWRTz(calc_mat)
+        
         value = 0
-        ii,jj,kk = coeffs.shape
+        ii,jj,kk = calc_mat.shape
         for i in range(ii):        
             for j in range(jj):            
                 for k in range(kk):                
-                    coeff = coeffs[i, j, k];                    
+                    coeff = calc_mat[i, j, k];                    
                     val = coeff * np.power(z, i) * np.power(y, j) * np.power(x, k)
                     value = value + val                                    
         return value
+
+    def diffWRTx(self,coeffs):        
+        x,y,z = coeffs.shape
+        partialX = np.zeros((x,y,z))
+        for i in range(1, x):
+            for j in range(0,y):
+                for k in range(0,z):
+                    partialX[i-1,j,k] = coeffs[i,j,k]*i
+        return partialX
+
+    def diffWRTy(self,coeffs):        
+        x,y,z = coeffs.shape
+        partialY = np.zeros((x,y,z))
+        for i in range(0, x):
+            for j in range(1,y):
+                for k in range(0,z):
+                    partialY[i,j-1,k] = coeffs[i,j,k]*j
+        return partialY
+    
+    def diffWRTz(self,coeffs):        
+        x,y,z = coeffs.shape
+        partialZ = np.zeros((x,y,z))
+        for i in range(0, x):
+            for j in range(0,y):
+                for k in range(1,z):
+                    partialZ[i,j,k-1] = coeffs[i,j,k]*k
+        return partialZ
+
+    def make_coeffs(self, x, y, z):                                        
+        # 1. Build the points around the centre as a cube - 8 points
+        vals = self.build_cube_around(x, y, z, self.points)
+        #2. Multiply with the precomputed matrix to find the multivariate polynomial
+        ABC = self.mult_vector(self.inv.get_invariant(), vals)
+        # 3. Put the 8 values back into a cube
+        polyCoeffs = np.zeros((self.points, self.points, self.points))
+        pos = 0
+        for i in range(self.points):
+            for j in range(self.points):                
+                for k in range(self.points):                    
+                    polyCoeffs[i, j, k] = ABC[pos]
+                    pos+=1        
+        #4. Adjust the values to be within this cube
+        pstart = (-1 * self.points / 2) + 1        
+        xn = x - np.floor(x) - pstart
+        yn = y - np.floor(y) - pstart
+        zn = z - np.floor(z) - pstart
+        return xn,yn,zn,polyCoeffs
             
 ####################################################################################################
 ### B-Spline
