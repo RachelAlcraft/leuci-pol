@@ -48,7 +48,7 @@ def single_slice():
             spc = space.SpaceTransform(central, linear, planar)
             gm = grid.GridMaker()    
             u_coords = gm.get_unit_grid(width,samples)        
-            xyz_coords = spc.get_coords(u_coords)
+            xyz_coords = spc.convert_coords(u_coords)
             sl_vals = itrp.get_val_slice(xyz_coords)
             print(sl_vals)
                                                                                         

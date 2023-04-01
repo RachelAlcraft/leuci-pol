@@ -21,7 +21,7 @@ full_test = False
 def nearest_interp():
     print("Checking simple nearest")
     # the 3d data is in a list of values, with the fastest changing axis first, called F, M, S (fast, medium, slow)
-    vals = [1,2,3,4,5,6,7,8]
+    vals = [[[1,2],[3,4]],[[5,6],[7,8]]]
     f,m,s = 2,2,2
     # simplest creation of an interpolator, add values, specify the axis, ask for a value
     intr = pol.create_interpolator("nearest",vals,F=f,M=m,S=s,log_level=1)    

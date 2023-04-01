@@ -1,0 +1,138 @@
+Before performance improvements
+*************************************************************
+6eex
+Download= 0:00:00.005971
+Load= 0:00:00.063616
+============= nearest =================
+Interpolator: nearest 36 24 64 degree= -1
+Interper= nearest 0:00:00.024411
+Density= nearest 0:00:00.013367
+Radient= nearest 0:00:00.023291
+Laplacian= nearest 0:00:00.033718
+Total= nearest 0:00:00.095092
+============= linear =================
+Interpolator: linear 36 24 64 degree= -1
+Interper= linear 0:00:00.029489
+Density= linear 0:00:00.016853
+Radient= linear 0:00:00.034657
+Laplacian= linear 0:00:00.033376
+Total= linear 0:00:00.114727
+============= cubic =================
+Interpolator: cubic 36 24 64 degree= -1
+Interper= cubic 0:00:00.031103
+Density= cubic 0:00:00.075624
+Radient= cubic 0:00:00.142889
+Laplacian= cubic 0:00:00.169397
+Total= cubic 0:00:00.419363
+============= bspline =================
+Interpolator: bspline 36 24 64 degree= -1
+Interper= bspline 0:00:04.629703
+Density= bspline 0:00:00.023822
+Radient= bspline 0:00:00.051950
+Laplacian= bspline 0:00:00.071179
+Total= bspline 0:00:04.776941
+====================================================
+1ejg
+Download= 0:00:00.030924
+Load= 0:00:06.969536
+============= nearest =================
+Interpolator: nearest 203 215 187 degree= -1
+Interper= nearest 0:00:02.155894
+Density= nearest 0:00:00.008507
+Radient= nearest 0:00:00.022902
+Laplacian= nearest 0:00:00.040485
+Total= nearest 0:00:02.228009
+============= linear =================
+Interpolator: linear 203 215 187 degree= -1
+Interper= linear 0:00:02.308928
+Density= linear 0:00:00.025698
+Radient= linear 0:00:00.024908
+Laplacian= linear 0:00:00.026753
+Total= linear 0:00:02.386777
+============= cubic =================
+Interpolator: cubic 203 215 187 degree= -1
+Interper= cubic 0:00:02.193110
+Density= cubic 0:00:00.084453
+Radient= cubic 0:00:00.112911
+Laplacian= cubic 0:00:00.108648
+Total= cubic 0:00:02.499410
+============= bspline =================
+Interpolator: bspline 203 215 187 degree= -1
+Interper= bspline 0:01:41.252680
+Density= bspline 0:00:00.013435
+Radient= bspline 0:00:00.059591
+Laplacian= bspline 0:00:00.083247
+Total= bspline 0:01:41.409316
+====================================================
+
+Step 1: Changing the bspline padding function to be a matrix manipulation not a 3d loop
+Step 2: immediately make data in numpy
+Step 3: in place changes for coefficient making
+
+### VALUES ###
+#### bspline with old copy method ####
+Interpolator: bspline 36 24 64 degree= -1
+Start xyz (2.939,9.67,18.422)
+Crs (29.0584,7.6586,51.7109) 4.186130798192339
+return xyz (2.939,9.67,18.422)
+Crs (50,50,50) -0.1311165392398836
+Crs (0,0.1,-0.1) -0.7706719404535407
+Crs (-1,-1.5,-1) -0.09008456290105395
+Crs (10,5,12) -0.2946600615978242
+Crs (10.5,5.5,12.5) -0.02546376978902532
+Crs (29.0584,7.6586,51.7109) 4.186145503113502
+#### bspline with in place coeffs ####
+Interpolator: bspline 36 24 64 degree= -1
+Start xyz (2.939,9.67,18.422)
+Crs (29.0584,7.6586,51.7109) 4.186130798192339
+return xyz (2.939,9.67,18.422)
+Crs (50,50,50) -0.1311165392398836
+Crs (0,0.1,-0.1) -0.7706719404535407
+Crs (-1,-1.5,-1) -0.09008456290105395
+Crs (10,5,12) -0.2946600615978242
+Crs (10.5,5.5,12.5) -0.02546376978902532
+Crs (29.0584,7.6586,51.7109) 4.186145503113502
+#### bspline no coeffs just values ####
+Interpolator: bspline 36 24 64 degree= -1
+Start xyz (2.939,9.67,18.422)
+Crs (29.0584,7.6586,51.7109) 2.9876272378338844
+return xyz (2.939,9.67,18.422)
+Crs (50,50,50) 0.05134092854266917
+Crs (0,0.1,-0.1) -0.31951064579819866
+Crs (-1,-1.5,-1) -0.10725221970858034
+Crs (10,5,12) -0.2225855929923624
+Crs (10.5,5.5,12.5) -0.10422261462184888
+Crs (29.0584,7.6586,51.7109) 2.987637676637697
+#### cubic ####
+Interpolator: cubic 36 24 64 degree= -1
+Start xyz (2.939,9.67,18.422)
+Crs (29.0584,7.6586,51.7109) 4.025863379338893
+return xyz (2.939,9.67,18.422)
+Crs (50,50,50) -0.13111653923994776
+Crs (0,0.1,-0.1) -0.4356310011991774
+Crs (-1,-1.5,-1) -0.025750009343028585
+Crs (10,5,12) -0.2946600615978375
+Crs (10.5,5.5,12.5) -0.04663663247234458
+Crs (29.0584,7.6586,51.7109) 4.025885439815755
+#### linear ####
+Interpolator: linear 36 24 64 degree= -1
+Start xyz (2.939,9.67,18.422)
+Crs (29.0584,7.6586,51.7109) 3.5598346627782815
+return xyz (2.939,9.67,18.422)
+Crs (50,50,50) -0.13111653923988342
+Crs (0,0.1,-0.1) -0.4283981065452099
+Crs (-1,-1.5,-1) -0.04245683550834656
+Crs (10,5,12) -0.2946600615978241
+Crs (10.5,5.5,12.5) -0.09164620464434847
+Crs (29.0584,7.6586,51.7109) 3.559878360400052
+#### nearest ####
+Interpolator: nearest 36 24 64 degree= -1
+Start xyz (2.939,9.67,18.422)
+Crs (29.0584,7.6586,51.7109) 3.794482707977295
+return xyz (2.939,9.67,18.422)
+Crs (50,50,50) -0.13111653923988342
+Crs (0,0.1,-0.1) -0.4757149815559387
+Crs (-1,-1.5,-1) -0.21272742748260498
+Crs (10,5,12) -0.2946600615978241
+Crs (10.5,5.5,12.5) -0.2946600615978241
+Crs (29.0584,7.6586,51.7109) 3.794482707977295

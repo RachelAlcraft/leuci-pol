@@ -135,3 +135,7 @@ instructions/rel_to_pypi.txt
 # Don;t upload test data
 *.ccp4
 *.pdb
+examples/resultsx/*.*
+examples/results/*.*
+examples/data/*.*
+examples/datax/*.*

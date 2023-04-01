@@ -19,7 +19,7 @@ from leuci_xyz import spacetransform as space
 
 
 ########## INPUTS #################
-vals = [1,2,3,4,5,6,7,8]
+vals = [[[1,2],[3,4]],[[5,6],[7,8]]]
 f,m,s = 2,2,2    
 central = v3.VectorThree(1,1,1)
 linear = v3.VectorThree(1,1,0)

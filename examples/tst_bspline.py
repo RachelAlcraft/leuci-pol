@@ -22,8 +22,8 @@ import leuci_xyz.vectorthree as v3
 
 ########## INPUTS #################
 pdb_code = "6eex"
-#interp_methods = ["nearest","linear","cubic","bspline"]
-interp_methods = ["linear","bspline"]
+#interp_methods = ["nearest","linear","cubic","bspline","mspline"]
+interp_methods = ["mspline"]
 ########## EXAMPLE #################
 def query_pdb():
     print("Showing pdb details", pdb_code)
@@ -34,7 +34,7 @@ def query_pdb():
     po.load_values()
     my_pdb = po.pobj
     al,ac,ap = my_pdb.get_first_three()
-    print(ac,al,ap)
+    #print(ac,al,ap)
     keyc = my_pdb.get_key(ac)            
     coordsc = my_pdb.get_coords_key(keyc)    
     print(keyc,coordsc)    

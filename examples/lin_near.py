@@ -22,7 +22,7 @@ from leuci_xyz import vectorthree as v3
 def nearest_interp():
     print("Checking simple nearest")
     # the 3d data is in a list of values, with the fastest changing axis first, called F, M, S (fast, medium, slow)
-    vals = [1,2,3,4,5,6,7,8]
+    vals = [[[1,2],[3,4]],[[5,6],[7,8]]]
     f,m,s = 2,2,2
     nr_pol = pol.create_interpolator("nearest",vals,F=f,M=m,S=s)
     lin_pol = pol.create_interpolator("linear",vals,F=f,M=m,S=s)
