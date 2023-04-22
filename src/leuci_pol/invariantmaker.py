@@ -8,6 +8,7 @@ import math
 
 class InvariantMaker(object):
     def __init__(self, dimensions):                
+        self.round = 14
         dimX, dimY, dimZ = dimensions[0],1,1
         if len(dimensions) > 1:
             dimY = dimensions[1]
@@ -25,10 +26,10 @@ class InvariantMaker(object):
                         for jc in range(0, dimY):
                             for kc in range(0, dimZ):
                                 sec += 1
-                                seCoeff = math.pow(i, ic) * math.pow(j, jc) * math.pow(k, kc);
-                                simul[ser, sec] = seCoeff;
+                                seCoeff = math.pow(i, ic) * math.pow(j, jc) * math.pow(k, kc)                                
+                                simul[ser, sec] = seCoeff
 
-        self.alcraft = inv(simul)
+        self.alcraft = np.round(inv(simul),14)
 
     def save_as_file(self,filename,degree):
         with open(filename,"w") as fw:

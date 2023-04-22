@@ -50,7 +50,7 @@ class Interpolator(ABC):
         self.log_level = log_level         
         self.h = 0.0001 #this is the interval for numerical differentiation
         self.padded = False
-        self.buffer = 12
+        self.buffer = 14
         self.round = 12
         self.TOLERANCE = 2.2204460492503131e-016 # smallest such that 1.0+DBL_EPSILON != 1.0                                
     ############################################################################################################            
@@ -109,8 +109,8 @@ class Interpolator(ABC):
         return dd
                 
     def get_fms(self,f,m,s,F=-1,M=-1,S=-1):        
-        #u_f, u_m, u_s = self.get_adjusted_fms(f,m,s,F,M,S)
-        return self._npy[int(f),int(m),int(s)]
+        u_f, u_m, u_s = self.get_adjusted_fms(f,m,s,F,M,S)
+        return self._npy[int(u_f),int(u_m),int(u_s)]
         #pos = self.get_pos_from_fms(u_f,u_m,u_s,F,M,S)
         #return self._values[pos]
     
@@ -159,29 +159,17 @@ class Interpolator(ABC):
         pos += f        
         return pos
     
-    def get_adjusted_fms_buffered(self, f, m, s):
-        use_f,use_m,use_s = self._F, self._M, self._S
-        u_f,u_m,u_s = f+self.buffer,m+self.buffer,s+self.buffer
-        while u_f < self.buffer:
-            u_f += use_f
-        while u_f >= use_f+self.buffer:
-            u_f -= use_f        
-        while u_m < self.buffer:
-            u_m += use_m
-        while u_m >= use_m+self.buffer:
-            u_m -= use_m
-        while u_s < self.buffer:
-            u_s += use_s
-        while u_s >= use_s+self.buffer:
-            u_s -= use_s
-        return round(u_f,self.round), round(u_m,self.round), round(u_s,self.round)
-
     def get_adjusted_fms(self, f, m, s,F=-1,M=-1,S=-1):                
         use_f,use_m,use_s = self._F, self._M, self._S
         if F+M+S != -3:
             use_f,use_m,use_s = F,M,S        
         u_f,u_m,u_s = f,m,s        
-        addon = 0        
+        addon = 0
+        #if self.padded:
+        #    u_f,u_m,u_s = u_f+self.buffer,u_m+self.buffer,u_s+self.buffer        
+        #    #use_f,use_m,use_s = use_f+self.buffer,use_m+self.buffer,use_s+self.buffer        
+        #    addon = self.buffer
+        # Unit wrap F
         while u_f < 0+addon:
             u_f += use_f
         while u_f >= use_f:
@@ -274,8 +262,7 @@ class Interpolator(ABC):
                 yp = np.floor(round(y,self.round)+j)
                 for k in range(int(-1*width/2 + 1), int(width/2 + 1)):          
                     zp = np.floor(round(z,self.round)+k)            
-                    u_f, u_m, u_s = self.get_adjusted_fms(xp, yp, zp)
-                    p = self.get_fms(u_f, u_m, u_s)
+                    p = self.get_fms(xp, yp, zp)
                     #print(xp,yp,zp)
                     #vals.append(p)                    
                     arr[count] = p
@@ -283,7 +270,24 @@ class Interpolator(ABC):
         #npvals = np.array(vals)    
         #return npvals
         return arr
-        
+
+    def build_cube_aroundx(self, x, y, z, width):        
+        # 1. Build the points around the centre as a cube - width points        
+        arr = np.zeros((width*width*width))        
+        xp,yp,zp = 0,0,0         
+        half = int(width/2)        
+        count = 0
+        for i in range(width):
+            xp = np.floor(round(x,self.round))+i-half-1
+            for j in range(width):
+                yp = np.floor(round(y,self.round))+j-half-1
+                for k in range(width):
+                    zp = np.floor(round(z,self.round))+k-half-1
+                    p = self.get_fms(xp, yp, zp)
+                    arr[count] = p
+                    count += 1
+        return arr
+    
     def mult_vector(self,A, V):     #A and V are numpy arrays
         use_np = True
         if use_np:
@@ -310,9 +314,8 @@ class Nearest(Interpolator):
         pass
     def get_value(self, x, y, z):
         closest_pnt = self.closest(v3.VectorThree(x,y,z))  
-        #print(closest_pnt.A, closest_pnt.B,closest_pnt.C)
-        u_f, u_m, u_s = self.get_adjusted_fms(closest_pnt.A, closest_pnt.B,closest_pnt.C)
-        return self.get_fms(u_f, u_m, u_s)
+        #print(closest_pnt.A, closest_pnt.B,closest_pnt.C)      
+        return self.get_fms(closest_pnt.A, closest_pnt.B,closest_pnt.C)    
     ## implement abstract interface #########################################
     def get_radient(self, x, y, z):
         return self.get_radient_numerical(x,y,z)
@@ -509,24 +512,285 @@ class Bspline(Interpolator):
     """
     def init(self):                
         self.padded = True
-        self.buffer = 12
         self.make_periodic_coeffs() 
-    ########################################################################
+
+                    
     ## implement abstract interface #########################################
     def get_radient(self, x, y, z):
         return self.get_radient_numerical(x,y,z)
-    ########################################################################    
+    
     def get_laplacian(self, x, y, z):
         return self.get_laplacian_numerical(x,y,z)
-    ########################################################################
+    ## iplement abstract interface ###########################################
+
+    def simple_copy_coeffs(self):      
+        self._coeffs = np.copy(self._npy)
+
+    def make_periodic_coeffs(self):
+        # we make the coefficients matrix a bit bigger than the vaues and have it wrap, and then cut it back down to the values                         
+        if not self.padded:
+            self.simple_copy_coeffs()            
+            self.create_coeffs_copy(self._F,self._M,self._S)                    
+        else:
+            self._coeffs =self.extend_vals_with_buffer(self.buffer)
+            #print(self._coeffs)            
+            self.create_coeffs_copy(self._F,self._M,self._S)        
+            #print(self._coeffs)
+            #self._coeffs = self.reduce_vals_with_buffer(self.buffer, self._coeffs)
+        #print(self._npy)
+        #print(self._coeffs)
+                
+    def reduce_vals_with_buffer(self,buffer, mynpy):        
+        xx,yy,zz = mynpy.shape
+        smnpy = mynpy[buffer:xx-buffer,buffer:yy-buffer,buffer:zz-buffer]
+        return smnpy
+        
+    def extend_vals_with_buffer(self,buffer):        
+        #// 1. Make a buffer padded values cube for periodic values        
+        xxa,yya,zza = self._F, self._M, self._S        
+        padded = np.pad(self._npy,[(buffer,buffer),(buffer,buffer),(buffer,buffer)])        
+        # pad z
+        for z in range(buffer):
+            for y in range(-1*buffer, self._M+buffer):
+                for x in range(-1*buffer, self._F+buffer):
+                    p = self.get_fms(x-buffer,y-buffer,z-buffer)
+                    padded[x,y,z] = p                            
+        for z in range(zza,zza+buffer):
+            for y in range(-1*buffer, self._M+buffer):
+                for x in range(-1*buffer, self._F+buffer):
+                    p = self.get_fms(x-buffer,y-buffer,z-buffer)                    
+                    padded[x,y,z] = p                                            
+        # pad y
+        for y in range(buffer):
+            for z in range(-1*buffer, self._S+buffer):
+                for x in range(-1*buffer, self._F+buffer):
+                    p = self.get_fms(x-buffer,y-buffer,z-buffer)
+                    padded[x,y,z] = p                            
+        for y in range(yya,yya+buffer):
+            for z in range(-1*buffer, self._S+buffer):
+                for x in range(-1*buffer, self._F+buffer):
+                    p = self.get_fms(x-buffer,y-buffer,z-buffer)                    
+                    padded[x,y,z] = p                                    
+        # pad x
+        for x in range(buffer):
+            for z in range(-1*buffer, self._S+buffer):
+                for y in range(-1*buffer, self._M+buffer):
+                    p = self.get_fms(x-buffer,y-buffer,z-buffer)
+                    padded[x,y,z] = p                            
+        for x in range(xxa,xxa+buffer):
+            for z in range(-1*buffer, self._S+buffer):
+                for y in range(-1*buffer, self._M+buffer):
+                    p = self.get_fms(x-buffer,y-buffer,z-buffer)                    
+                    padded[x,y,z] = p                                    
+        
+        
+        return padded
+                                                                  
+    def create_coeffs_inplace(self, thisF, thisM, thisS):
+        pole = self.get_pole(self.degree)
+        num_poles = len(pole)
+        #Convert the samples to interpolation coefficients
+        #X-wise
+        for y in range(thisM):        
+            for z in range(thisS):                        
+                row = self._coeffs[:,y:y+1,z:z+1].reshape([thisF])
+                self.convert_to_interp_coeffs_inplace(pole, num_poles, thisF, row)
+        #Y-wise
+        for x in range(thisF):        
+            for z in range(thisS):                        
+                row = self._coeffs[x:x+1,:,z:z+1].reshape([thisM])
+                self.convert_to_interp_coeffs_inplace(pole, num_poles, thisM, row)
+        #Z-wise
+        for x in range(thisF):
+            for y in range(thisM):                        
+                row = self._coeffs[x:x+1,y:y+1,:].reshape([thisS])
+                line = self.convert_to_interp_coeffs_inplace(pole, num_poles, thisS, row)
+
+    def create_coeffs_copy(self, thisF, thisM, thisS):
+        pole = self.get_pole(self.degree)
+        num_poles = len(pole)
+        #Convert the samples to interpolation coefficients
+        #X-wise
+        for y in range(thisM):        
+            for z in range(thisS):        
+                row = self.get_row3d(y, z, thisF,thisF, thisM, thisS)
+                line = self.convert_to_interp_coeffs(pole, num_poles, thisF, row)
+                self.put_row3d(y, z, line, thisF,thisF, thisM, thisS)                
+        #Y-wise
+        for x in range(thisF):        
+            for z in range(thisS):        
+                row = self.get_col3d(x, z, thisM,thisF, thisM, thisS)
+                line = self.convert_to_interp_coeffs(pole, num_poles, thisM, row)
+                self.put_col3d(x, z, line, thisM,thisF, thisM, thisS)                           
+        #Z-wise
+        for x in range(thisF):
+            for y in range(thisM):        
+                row = self.get_hole3d(x, y, thisS,thisF, thisM, thisS)
+                line = self.convert_to_interp_coeffs(pole, num_poles, thisS, row)
+                self.put_hole3d(x, y, line, thisS,thisF, thisM, thisS)
+                                                            
+    def get_pole(self,degree):        
+        #Recover the poles from a lookup table #currently only 3 degree, will I want to calculate all the possibilities at the beginnning, 3,5,7,9?
+        pole = []
+        if (degree == 9):        
+            pole.append(-0.60799738916862577900772082395428976943963471853991)
+            pole.append(-0.20175052019315323879606468505597043468089886575747)
+            pole.append(-0.043222608540481752133321142979429688265852380231497)
+            pole.append(-0.0021213069031808184203048965578486234220548560988624)
+        elif (degree == 7):        
+            pole.append(-0.53528043079643816554240378168164607183392315234269)
+            pole.append(-0.12255461519232669051527226435935734360548654942730)
+            pole.append(-0.0091486948096082769285930216516478534156925639545994)
+        elif (degree == 5):        
+            pole.append(np.sqrt(135.0 / 2.0 - np.sqrt(17745.0 / 4.0)) + np.sqrt(105.0 / 4.0) - 13.0 / 2.0)
+            pole.append(np.sqrt(135.0 / 2.0 + np.sqrt(17745.0 / 4.0)) - np.sqrt(105.0 / 4.0) - 13.0 / 2.0)
+        else:#then it is 3        
+            pole.append(np.sqrt(3.0) - 2.0)
+        return pole
+
+    def get_row3d(self,y,z,length,F,M,S):        
+        row = []
+        for x in range(length):
+            row.append(self.get_coeff(x, y, z,F,M,S))
+        return row
+    
+    def get_col3d(self,x,z,length,F,M,S):        
+        col = []
+        for y in range(length):
+            col.append(self.get_coeff(x, y, z,F,M,S))
+        return col
+    
+    def get_hole3d(self,x,y,length,F,M,S):        
+        bore = []
+        for z in range(length):
+            bore.append(self.get_coeff(x, y, z,F,M,S))
+        return bore
+    
+    def put_row3d(self,y,z,row,length,F,M,S):        
+        for x in range(length):
+            self.put_coeff(x, y, z, row[x],F,M,S)
+    
+    def put_col3d(self,x,z,col,length,F,M,S):        
+        for y in range(length):
+            self.put_coeff(x, y, z, col[y],F,M,S)
+    
+    def put_hole3d(self,x,y,bore,length,F,M,S):        
+        for z in range(length):
+            self.put_coeff(x, y, z, bore[z],F,M,S)
+    
+    def convert_to_interp_coeffs(self,pole, num_poles, width, row):        
+        #/* special case required by mirror boundaries */
+        if (width == 1):         
+            #mirror filter and periodic filter
+            #not much can be done if it is only 1 thivk, it is both mirror and periodic at the same time
+            return row        
+        lmbda = 1
+        n = 0
+        k = 0
+        #Compute the overall gain
+        for k in range(num_poles):
+            lmbda = lmbda * (1 - pole[k]) * (1 - 1 / pole[k])        
+        #Apply the gain
+        for n in range(width):
+            row[n] = row[n] * lmbda        
+        #loop over the poles            
+        for k in range(num_poles):        
+            #/* causal initialization */            
+            row[0] = self.initial_causal_coeffs(row, width, pole[k])            
+            #/* causal recursion */
+            for n in range(1,width):            
+                row[n] = row[n]+ pole[k] * row[n - 1]
+            #/* anticausal initialization */                        
+            row[width - 1] = self.initial_anticausal_coeffs(row, width, pole[k])
+            #/* anticausal recursion */
+            for n in range(width - 2, -1, -1):
+                row[n] = pole[k] * (row[n + 1] - row[n])
+        return row
+
+    def convert_to_interp_coeffs_inplace(self,pole, num_poles, width, row):        
+        #/* This version is periodic ONLY */
+        if (width == 1):#not much can be done if it is only 1 think            
+            return row        
+        lmbda = 1
+        #Compute the overall gain
+        for k in range(num_poles):
+            lmbda = lmbda * (1 - pole[k]) * (1 - 1 / pole[k])        
+        #Apply the gain
+        for n in range(width):
+            row[n] = row[n] * lmbda        
+        #loop over the poles            
+        for k in range(num_poles):                                
+            #/* causal recursion */            
+            for n in range(0,width):
+                m = n
+                if m < 0:
+                    m = -1*width%abs(n)
+                n1 = m-1                
+                row[m] = row[m]+ pole[k] * row[n1]                                    
+            
+            #/* anticausal recursion */            
+            for n in range(width-1, -1, -1):
+                n1 = n+1
+                if n1 >= width:
+                    n1 = n1%width
+                m = n1-1
+                row[m] = pole[k] * (row[n1] - row[m])
+        return row
+    
+    def initial_causal_coeffs(self, vals, length, pole):
+        #/* begin InitialCausalCoefficient */
+        Sum, zn, z2n, iz = 0.,0.,0.,0.
+        n, Horizon = 0,0
+        #/* this initialization corresponds to mirror boundaries */
+        Horizon = length
+        if (self.TOLERANCE > 0.0):        
+            Horizon = np.ceil(np.log(self.TOLERANCE) / np.log(abs(pole)))
+        if (Horizon < length):        
+            #/* accelerated loop */
+            zn = pole
+            Sum = vals[0]
+            for n in range(1,int(Horizon)):
+                Sum += zn * vals[n]
+                zn *= pole       
+            return Sum        
+        else:#// if (_mirror)
+            #// RSA notes is this a mirror condition? when the horizon - how far you need to look ahead for good data - is not as far the data you have
+            #/* full loop */
+            zn = pole
+            iz = 1.0 / pole
+            z2n = math.pow(pole, length - 1)
+            Sum = vals[0] + z2n * vals[length - 1]
+            z2n *= z2n * iz 
+            for n in range(1,length - 1):
+                Sum += (zn + z2n) * vals[n]
+                zn *= pole                
+                z2n *= iz
+            return (Sum / (1.0 - zn * zn))        
+                
+    def initial_anticausal_coeffs(self, vals, length, pole):        
+        #/* this initialization corresponds to mirror boundaries */
+        if (length < 2):
+            return 0;
+        else:#// if (_mirror)
+            return ((pole / (pole * pole - 1.0)) * (pole * vals[length - 2] + vals[length - 1]))
+
+    def get_coeff(self,x,y,z,F,M,S):        
+        # this naturally wraps round
+        u_x, u_y, u_z = self.get_adjusted_fms(x,y,z,F=F,M=M,S=S)
+        #pos = int(self.get_pos_from_fms(u_x,u_y,u_z,F=F,M=M,S=S))
+        value = self._coeffs[u_x,u_y,u_z]
+        return value
+                                        
+    def put_coeff(self,x,y,z,v,F,M,S):
+        #u_x, u_y, u_z = self.get_adjusted_fms(x,y,z,F=F,M=M,S=S)
+        #pos = int(self.get_pos_from_fms(u_x,u_y,u_z,F=F,M=M,S=S))
+        self._coeffs[x,y,z] = v
+
     def get_value(self, x, y, z):
         u_x, u_y, u_z = x,y,z        
-        # the values need to be within the buffer zone
         if self.padded:
-            u_x, u_y, u_z = self.get_adjusted_fms_buffered(u_x, u_y, u_z)
-            #print(u_x, u_y, u_z)
-        else:
-            u_x, u_y, u_z = self.get_adjusted_fms(u_x, u_y, u_z)
+            u_x, u_y, u_z = u_x+self.buffer,u_y+self.buffer,u_z+self.buffer        
+        u_x, u_y, u_z = self.get_adjusted_fms(u_x, u_y, u_z)
         weight_length = self.degree + 1
         xIndex, yIndex, zIndex = [],[],[]        
         xWeight, yWeight,zWeight = [],[],[]        
@@ -584,223 +848,7 @@ class Bspline(Interpolator):
                 w2 += yWeight[j] * w1
             w3 += zWeight[k] * w2
         return w3
-    ## iplement abstract interface ###########################################
-    ########################################################################
-    def simple_copy_coeffs(self):      
-        self._coeffs = np.copy(self._npy)
-
-    def make_periodic_coeffs(self):
-        # we make the coefficients matrix a bit bigger than the vaues and have it wrap, and then cut it back down to the values                         
-        if not self.padded:
-            self.simple_copy_coeffs()            
-            self.create_coeffs_copy(self._F,self._M,self._S)                    
-        else:
-            self._coeffs =self.extend_vals_with_buffer(self.buffer)            
-            self.create_coeffs_copy(self._F,self._M,self._S)        
-                                    
-    def reduce_vals_with_buffer(self,buffer, mynpy):        
-        xx,yy,zz = mynpy.shape
-        smnpy = mynpy[buffer:xx-buffer,buffer:yy-buffer,buffer:zz-buffer]
-        return smnpy
-        
-    def extend_vals_with_buffer(self,buffer):        
-        #// 1. Make a buffer padded values cube for periodic values        
-        xxa,yya,zza = self._F, self._M, self._S        
-        padded = np.pad(self._npy,[(buffer,buffer),(buffer,buffer),(buffer,buffer)])        
-        # pad z
-        for z in range(buffer):
-            for y in range(-1*buffer, self._M+buffer):
-                for x in range(-1*buffer, self._F+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
-                    padded[x,y,z] = p                            
-        for z in range(zza,zza+buffer):
-            for y in range(-1*buffer, self._M+buffer):
-                for x in range(-1*buffer, self._F+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
-                    padded[x,y,z] = p                                            
-        # pad y
-        for y in range(buffer):
-            for z in range(-1*buffer, self._S+buffer):
-                for x in range(-1*buffer, self._F+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
-                    padded[x,y,z] = p                            
-        for y in range(yya,yya+buffer):
-            for z in range(-1*buffer, self._S+buffer):
-                for x in range(-1*buffer, self._F+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
-                    padded[x,y,z] = p                                    
-        # pad x
-        for x in range(buffer):
-            for z in range(-1*buffer, self._S+buffer):
-                for y in range(-1*buffer, self._M+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
-                    padded[x,y,z] = p                            
-        for x in range(xxa,xxa+buffer):
-            for z in range(-1*buffer, self._S+buffer):
-                for y in range(-1*buffer, self._M+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
-                    padded[x,y,z] = p                                    
-        
-        
-        return padded
-                                                                      
-    def create_coeffs_copy(self, thisF, thisM, thisS):
-        pole = self.get_pole(self.degree)
-        num_poles = len(pole)
-        #Compute the overall gain
-        lmbda = 1                
-        for k in range(num_poles):
-            lmbda = lmbda * (1 - pole[k]) * (1 - 1 / pole[k])
-        #Convert the samples to interpolation coefficients
-        #X-wise
-        if thisF > 1:
-            for y in range(thisM):        
-                for z in range(thisS):        
-                    row = self.get_row3d(y, z, thisF,thisF, thisM, thisS)
-                    line = self.convert_to_interp_coeffs(pole, num_poles, thisF, row,lmbda)
-                    self.put_row3d(y, z, line, thisF,thisF, thisM, thisS)                
-        #Y-wise
-        if thisM > 1:
-            for x in range(thisF):        
-                for z in range(thisS):        
-                    row = self.get_col3d(x, z, thisM,thisF, thisM, thisS)
-                    line = self.convert_to_interp_coeffs(pole, num_poles, thisM, row,lmbda)
-                    self.put_col3d(x, z, line, thisM,thisF, thisM, thisS)                           
-        #Z-wise
-        if thisS > 1:
-            for x in range(thisF):
-                for y in range(thisM):        
-                    row = self.get_hole3d(x, y, thisS,thisF, thisM, thisS)
-                    line = self.convert_to_interp_coeffs(pole, num_poles, thisS, row,lmbda)
-                    self.put_hole3d(x, y, line, thisS,thisF, thisM, thisS)
-                                                            
-    def get_pole(self,degree):        
-        #Recover the poles from a lookup table #currently only 3 degree, will I want to calculate all the possibilities at the beginnning, 3,5,7,9?
-        pole = []
-        if (degree == 9):        
-            pole.append(-0.60799738916862577900772082395428976943963471853991)
-            pole.append(-0.20175052019315323879606468505597043468089886575747)
-            pole.append(-0.043222608540481752133321142979429688265852380231497)
-            pole.append(-0.0021213069031808184203048965578486234220548560988624)
-        elif (degree == 7):        
-            pole.append(-0.53528043079643816554240378168164607183392315234269)
-            pole.append(-0.12255461519232669051527226435935734360548654942730)
-            pole.append(-0.0091486948096082769285930216516478534156925639545994)
-        elif (degree == 5):        
-            pole.append(np.sqrt(135.0 / 2.0 - np.sqrt(17745.0 / 4.0)) + np.sqrt(105.0 / 4.0) - 13.0 / 2.0)
-            pole.append(np.sqrt(135.0 / 2.0 + np.sqrt(17745.0 / 4.0)) - np.sqrt(105.0 / 4.0) - 13.0 / 2.0)
-        else:#then it is 3        
-            pole.append(np.sqrt(3.0) - 2.0)
-        return pole
-
-    def get_row3d(self,y,z,length,F,M,S):        
-        row = []
-        for x in range(length):
-            row.append(self.get_coeff(x, y, z,F,M,S))
-        return row
     
-    def get_col3d(self,x,z,length,F,M,S):        
-        col = []
-        for y in range(length):
-            col.append(self.get_coeff(x, y, z,F,M,S))
-        return col
-    
-    def get_hole3d(self,x,y,length,F,M,S):        
-        bore = []
-        for z in range(length):
-            bore.append(self.get_coeff(x, y, z,F,M,S))
-        return bore
-    
-    def put_row3d(self,y,z,row,length,F,M,S):        
-        for x in range(length):
-            self.put_coeff(x, y, z, row[x],F,M,S)
-    
-    def put_col3d(self,x,z,col,length,F,M,S):        
-        for y in range(length):
-            self.put_coeff(x, y, z, col[y],F,M,S)
-    
-    def put_hole3d(self,x,y,bore,length,F,M,S):        
-        for z in range(length):
-            self.put_coeff(x, y, z, bore[z],F,M,S)
-    
-    def convert_to_interp_coeffs(self,pole, num_poles, width, row,lmbda):
-        #/* special case required by mirror boundaries */                
-        #Apply the gain
-        for n in range(width):
-            row[n] = row[n] * lmbda        
-        #loop over the poles            
-        for k in range(num_poles):        
-            #/* causal initialization */            
-            row[0] = self.initial_causal_coeffs(row, width, pole[k])            
-            #row[0] = row[0]+ pole[k] * row[width-1]
-            #/* causal recursion */
-            for n in range(1,width):            
-                row[n] = row[n]+ pole[k] * row[n - 1]
-            #/* anticausal initialization */                        
-            row[width - 1] = self.initial_anticausal_coeffs(row, width, pole[k])
-            ##row[width - 1] = ((pole[k] / (pole[k] * pole[k] - 1.0)) * (pole[k] * row[width - 2] + row[width - 1]))
-            #row[width-1] = pole[k] * (row[0] - row[width-1])
-            #/* anticausal recursion */            
-            for n in range(width - 2, -1, -1):
-                row[n] = pole[k] * (row[n + 1] - row[n])
-        return row
-        
-    def initial_causal_coeffs(self, vals, length, pole):
-        #/* begin InitialCausalCoefficient */
-        Sum, zn, z2n, iz = 0.,0.,0.,0.
-        n, Horizon = 0,0
-        #/* this initialization corresponds to mirror boundaries */
-        Horizon = length
-        if (self.TOLERANCE > 0.0):        
-            Horizon = np.ceil(np.log(self.TOLERANCE) / np.log(abs(pole)))
-        if (Horizon < length):        
-            #/* accelerated loop */
-            zn = pole
-            Sum = vals[0]
-            for n in range(1,int(Horizon)):
-                Sum += zn * vals[n]
-                zn *= pole       
-            return Sum        
-        else:#// if (_mirror)
-            #// RSA notes is this a mirror condition? when the horizon - how far you need to look ahead for good data - is not as far the data you have
-            #/* full loop */
-            zn = pole
-            iz = 1.0 / pole
-            z2n = math.pow(pole, length - 1)
-            Sum = vals[0] + z2n * vals[length - 1]
-            z2n *= z2n * iz 
-            for n in range(1,length - 1):
-                Sum += (zn + z2n) * vals[n]
-                zn *= pole                
-                z2n *= iz
-            return (Sum / (1.0 - zn * zn))        
-                
-    def initial_anticausal_coeffs(self, vals, length, pole):        
-        #/* this initialization corresponds to mirror boundaries */
-        if (length < 2):
-            return 0;
-        else:#// if (_mirror)
-            return ((pole / (pole * pole - 1.0)) * (pole * vals[length - 2] + vals[length - 1]))
-            #return ((pole / (pole * pole - 1.0)) * (pole * vals[0] + vals[length - 1]))
-
-    def get_coeff(self,x,y,z,F,M,S):        
-        # this naturally wraps round
-        #u_x, u_y, u_z = self.get_adjusted_fms(x,y,z,F=F,M=M,S=S)
-        #pos = int(self.get_pos_from_fms(u_x,u_y,u_z,F=F,M=M,S=S))
-        value = self._coeffs[x,y,z]
-        return value
-                                        
-    def put_coeff(self,x,y,z,v,F,M,S):
-        #u_x, u_y, u_z = self.get_adjusted_fms(x,y,z,F=F,M=M,S=S)
-        #pos = int(self.get_pos_from_fms(u_x,u_y,u_z,F=F,M=M,S=S))
-        self._coeffs[x,y,z] = v
-        
     def applyValue3(self,val, idc, weight_length):        
         ws = []
         for i in range(weight_length):

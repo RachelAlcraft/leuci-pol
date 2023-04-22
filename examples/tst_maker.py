@@ -26,18 +26,18 @@ from leuci_xyz import spacetransform as space
 def make():
     print("Making some matrices")
     # the 3d data is in a list of values, with the fastest changing axis first, called F, M, S (fast, medium, slow)        
-    mk1 = mak.InvariantMaker((2,2,2))    
-    mk1.save_as_file(EG_DIR + "1.py",1)
     mk1 = mak.InvariantMaker((4,4,4))    
-    mk1.save_as_file(EG_DIR + "3.py",3)
+    mk1.save_as_file(EG_DIR + "3.py",3)    
+    mk1 = mak.InvariantMaker((2,2,2))    
+    mk1.save_as_file(EG_DIR + "1.py",1)    
     mk1 = mak.InvariantMaker((6,6,6))    
     mk1.save_as_file(EG_DIR + "5.py",5)
     mk1 = mak.InvariantMaker((3,3,3))    
     mk1.save_as_file(EG_DIR + "2.py",2)
-
     mk1 = mak.InvariantMaker((4,1,1))    
     mk1.save_as_file(EG_DIR + "4_1d.py",4)
     mk1 = mak.InvariantMaker((2,1,1))    
     mk1.save_as_file(EG_DIR + "2_1d.py",2)
+    
     
 make()

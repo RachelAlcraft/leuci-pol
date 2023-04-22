@@ -1,4 +1,4 @@
-Before performance improvements
+Before performance improvements - 8 width samples 10 (?)
 *************************************************************
 6eex
 Download= 0:00:00.005971

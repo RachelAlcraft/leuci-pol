@@ -10,7 +10,7 @@ CODEDIR = str(Path(__file__).resolve().parent.parent )+ "/src/"
 import sys
 sys.path.append(CODEDIR)
 from pathlib import Path
-import leuci_pol.interpolator as pol
+import leuci_pol.interpolator_old as pol
 from leuci_xyz import vectorthree as v3
 from leuci_xyz import gridmaker as grid
 from leuci_xyz import spacetransform as space
@@ -39,6 +39,15 @@ def nearest_slice():
     print("yz", valsyz)
     valszx = itrp.get_projection("zx")            
     print("zx", valszx)
+
+    valsxy_atoms = itrp.get_projection("xy",xmin=-10,xmax=10,ymin=-10,ymax=10)
+    print("xy_atoms", valsxy_atoms)
+    valsyz_atoms = itrp.get_projection("yz",xmin=-10,xmax=10,ymin=-10,ymax=10)
+    print("yz_atoms", valsyz_atoms)
+    valszx_atoms = itrp.get_projection("zx",xmin=-10,xmax=10,ymin=-10,ymax=10)
+    print("zx_atoms", valszx_atoms)
+
+    
     
     
                         

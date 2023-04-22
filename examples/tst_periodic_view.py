@@ -21,18 +21,21 @@ if True:
   degree = 3  
   test_methods = ["nearest","linear","cubic","bspline"]
   #test_methods = ["cubic","bspline"]
-  width=10
-  samples=71
+  width=5
+  samples=61
   ###################################
   ## GRID ##
   gm = grid.GridMaker()
   u_coords = gm.get_unit_grid(width,samples)
     # Create the 3 coordinates for orientation  
   central = v3.VectorThree(0,0,0)
-  linear = v3.VectorThree(1,0,0)
-  planar = v3.VectorThree(1,1,0)
-  spc = space.SpaceTransform(central, linear, planar)                    
-  xyz_coords = spc.convert_coords(u_coords)        
+  #linear = v3.VectorThree(1,0,0)
+  linear = v3.VectorThree(1,0,0.5)
+  planar = v3.VectorThree(1,1,0)  
+  #planar = v3.VectorThree(1,0.33333,0) 
+  
+  spc = space.SpaceTransform(central, linear, planar)
+  xyz_coords = spc.convert_coords(u_coords)
   ###################################
 
   for interp_method in test_methods:
@@ -63,7 +66,7 @@ if True:
         l0 = (0 - minl) / (maxl - minl)
       print(minl, maxl, l0)
       data_laps = go.Heatmap(z=lvals,showscale=False,
-                             colorscale=[(0, "rgb(100,0,0)"),(l0/2, "crimson"), (l0, "silver"), (3*l0/2, "blue"),(1, "navy")],)
+                             colorscale=[(0, "rgb(100,0,0)"),(l0/2, "crimson"), (l0, "silver"), (2*l0/3, "blue"),(1, "navy")],)
       
       data_vals = go.Heatmap(z=dvals,showscale=True, 
                           colorscale=[(0, "grey"), (0.1, "snow"), (0.5, "cornflowerblue"),(0.9, "crimson"),(1.0, "rgb(100,0,0)")],)

@@ -5,7 +5,7 @@ Checking in speed improvements the images stay the sanme
 
 """
 ################### USER INPUTS #######################
-which_examples = [1,2,3] 
+which_examples = [0,1,2,3,4,5] 
 width = 8           # in angstrom
 samples = 101       # number of sample points along each axis to interpolate
 degree = 3
@@ -40,11 +40,12 @@ examples.append(["sp_tst_spline","6eex",
 
 examples.append(["sp_tst_join","6axz",
                   ["(-1.642,-4.843,-1.864)","(-1.015,-4.682,-3.268)","(-2.865,-4.79,-1.72)"],
-                  [("density",2,-1,0.8,0.5,(1,1),"RGB","linear"),("radient",2,-1,0.8,0.8,(1,2),"BW","linear"),("laplacian",2,-1,0.8,0.5,(1,3),"RB","linear"),
-                    ("density",2,-1,0.8,0.5,(2,1),"RGB","cubic"),("radient",2,-1,0.8,0.8,(2,2),"BW","cubic"),("laplacian",2,-1,0.8,0.5,(2,3),"RB","cubic"),
-                  ("density",2,-1,0.8,0.5,(3,1),"RGB","bspline"),("radient",2,-1,0.8,0.8,(3,2),"BW","bspline"),("laplacian",2,-1,0.8,0.5,(3,3),"RB","bspline")                  
+                  [
+                    #("density",2,-1,0.8,0.5,(1,1),"RGB","linear"),("radient",2,-1,0.8,0.8,(1,2),"BW","linear"),("laplacian",2,-1,0.8,0.5,(1,3),"RB","linear"),
+                    ("density",2,-1,0.8,0.5,(1,1),"RGB","cubic"),("radient",2,-1,0.8,0.8,(1,2),"BW","cubic"),("laplacian",2,-1,0.8,0.5,(1,3),"RB","cubic"),
+                  ("density",2,-1,0.8,0.5,(2,1),"RGB","bspline"),("radient",2,-1,0.8,0.8,(2,2),"BW","bspline"),("laplacian",2,-1,0.8,0.5,(2,3),"RB","bspline")                  
                   ],
-                  (3,3),
+                  (2,3),
                   ("density ","radient ","laplacian ",
                     "density ","radient ","laplacian ",
                   "density bspline","radient bspline","laplacian bspline")])       #4
