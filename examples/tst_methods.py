@@ -18,7 +18,7 @@ from leuci_xyz import vectorthree as v3
 degree = 3
 #test_methods = ["nearest","linear","cubic"]
 #test_methods = ["nearest","linear","cubic","bspline","rspline"]
-test_methods = ["linear","bspline"]
+test_methods = ["nearest","mv1","linear","mv3","bspline"]
 ###################################
 for interp_method in test_methods:
     print("############# Testing", interp_method, "########################")    
@@ -29,18 +29,35 @@ for interp_method in test_methods:
     f,m,s = len(vals),len(vals[0]),len(vals[0][0])
     # simplest creation of an interpolator, add values, specify the axis, ask for a value
     intr = pol.create_interpolator(interp_method,vals,F=f,M=m,S=s,log_level=1,degree=degree)    
-    print("1 =", intr.get_value(0,0,0)) 
-    print("2 =", intr.get_value(0,0,1)) 
-    print("3 =", intr.get_value(0,1,0)) 
-    print("4 =", intr.get_value(0,1,1)) 
-    print("5 =", intr.get_value(1,0,0)) 
-    print("6 =", intr.get_value(1,0,1)) 
-    print("7 =", intr.get_value(1,1,0)) 
-    print("8 =", intr.get_value(1,1,1)) 
+    all_once = False
+    if all_once:
+        pnts = [(0,0,0),(0,0,1),(0,1,0),(0,1,1),(1,0,0),(1,0,1),(1,1,0),(1,1,1),(-0.5,-0.5,-0.5),(-1,-1,-1),(2,2,2)]
+        vals = intr.get_values(pnts)
+        print("1 =",vals[0]) 
+        print("2 =",vals[1]) 
+        print("3 =",vals[2]) 
+        print("4 =",vals[3]) 
+        print("5 =",vals[4]) 
+        print("6 =",vals[5]) 
+        print("7 =",vals[6]) 
+        print("8 =",vals[7]) 
+        print("-0.5 =",vals[8])   
+        print("8(-1) =",vals[9]) 
+        print("1(2) =",vals[10]) 
+    else:    
+        print("1 =", intr.get_value(0,0,0)) 
+        print("2 =", intr.get_value(0,0,1)) 
+        print("3 =", intr.get_value(0,1,0)) 
+        print("4 =", intr.get_value(0,1,1)) 
+        print("5 =", intr.get_value(1,0,0)) 
+        print("6 =", intr.get_value(1,0,1)) 
+        print("7 =", intr.get_value(1,1,0)) 
+        print("8 =", intr.get_value(1,1,1)) 
 
-    print("-0.5 =", intr.get_value(-0.5,-0.5,-0.5)) 
-    print("8(-1) =", intr.get_value(-1,-1,-1)) 
-    print("1(2) =", intr.get_value(2,2,2)) 
+        print("0.5 =", intr.get_value(0.5,0.5,0.5)) 
+        print("-0.5 =", intr.get_value(-0.5,-0.5,-0.5)) 
+        print("8(-1) =", intr.get_value(-1,-1,-1)) 
+        print("1(2) =", intr.get_value(2,2,2)) 
 
 
     #if interp_method == "bspline":

@@ -6,46 +6,56 @@ from abc import ABC, abstractmethod
 from leuci_xyz import vectorthree as v3
 import math
 import numpy as np
+#from scipy.interpolate import RegularGridInterpolator
+#from numba import njit
 
 #from . import invariant as ivm
 from . import iv1
 from . import iv3
 from . import iv5
+from . import interp_help as help
 
 
 
 
 ### Factory method for creation ##############################################################
-def create_interpolator(method, values, F, M, S, npy=None,degree=-1, log_level=0):
+def create_interpolator(method, values, F, M, S, degree=-1,periodic=1,log_level=0):
     if log_level > 0:
         print("Interpolator:",method,F,M,S,"degree=",degree)
     intr = None
-    if method == "linear":
-        intr = Multivariate(values,F, M, S,1, log_level)
+    if method == "linear":        
+        #intr = Linear(values,F, M, S,1, log_level)
+        intr = Multivariate(values,F, M, S,1, periodic,log_level)        
+    elif method == "mv1":
+        intr = Multivariate(values,F, M, S,1, periodic,log_level)        
     ## DEGREE 5 explicitly ##
-    elif method == "cubic" and degree == 5: #not really cubic, but quintic
-        intr = Multivariate(values,F, M, S,5, log_level)
+    elif (method == "cubic" and degree == 5) or method == "mv5": #not really cubic, but quintic
+        intr = Multivariate(values,F, M, S,5, periodic,log_level)
     elif method == "bspline" and degree == 5:
-        intr = Bspline(values,F, M, S, 5, log_level) # I am being cautious about degrees
+        intr = Bspline(values,F, M, S, 5, periodic,log_level) # I am being cautious about degrees
     ### degree 3 ###
-    elif method == "cubic":
-        intr = Multivariate(values,F, M, S,3, log_level)        
+    elif method == "cubic" or method == "mv3":
+        intr = Multivariate(values,F, M, S,3, periodic,log_level)        
     elif method == "bspline":
-        intr = Bspline(values,F, M, S,3, log_level) 
+        intr = Bspline(values,F, M, S,3, periodic,log_level) 
     else: #nearest is default
-        intr = Nearest(values,F, M, S,0,log_level)
+        intr = Nearest(values,F, M, S,0,periodic,log_level)
     intr.init()
     return intr
 
 ### Abstract class ############################################################################
 class Interpolator(ABC):
-    def __init__(self, values, F, M, S, degree=-1,log_level=0):                             
+    def __init__(self, values, F, M, S, degree=-1,periodic=1,log_level=0):                             
         self._npy = np.copy(values).astype(float)
+        self._linx = np.linspace(0,F-1,F).astype(int)
+        self._liny = np.linspace(0,M-1,M).astype(int)
+        self._linz = np.linspace(0,S-1,S).astype(int)                            
         self._F = F
         self._M = M
         self._S = S
         self.degree = degree        
-        self.log_level = log_level         
+        self.log_level = log_level
+        self.periodic = periodic
         self.h = 0.0001 #this is the interval for numerical differentiation
         self.padded = False
         self.buffer = 12
@@ -55,7 +65,7 @@ class Interpolator(ABC):
     @abstractmethod
     def get_value(self, x, y, z):
         pass
-    
+        
     @abstractmethod
     def get_radient(self, x, y, z):
         pass
@@ -64,7 +74,7 @@ class Interpolator(ABC):
     def get_laplacian(self, x, y, z):
         pass
     ############################################################################################################
-    # implemented interface that is the same for all abstractions
+    # implemented interface that is the same for all abstractions                    
     def make_radient(self,dx,dy,dz):
         radient = abs(dx) + abs(dy) + abs(dz)
         #radient = dx+dy+dz                                
@@ -106,9 +116,9 @@ class Interpolator(ABC):
         dd = (va + vb - 2 * val) / (self.h * self.h)
         return dd
                 
-    def get_fms(self,f,m,s,F=-1,M=-1,S=-1):        
-        #u_f, u_m, u_s = self.get_adjusted_fms(f,m,s,F,M,S)
-        return self._npy[int(f),int(m),int(s)]
+    def get_fms(self,f,m,s):
+        u_f, u_m, u_s = self.get_adjusted_fms_int(f,m,s)
+        return self._npy[int(u_f),int(u_m),int(u_s)]
         #pos = self.get_pos_from_fms(u_f,u_m,u_s,F,M,S)
         #return self._values[pos]
     
@@ -157,6 +167,7 @@ class Interpolator(ABC):
         pos += f        
         return pos
     
+    """
     def get_adjusted_fms_buffered(self, f, m, s):
         use_f,use_m,use_s = self._F, self._M, self._S
         u_f,u_m,u_s = f+self.buffer,m+self.buffer,s+self.buffer
@@ -173,29 +184,55 @@ class Interpolator(ABC):
         while u_s >= use_s+self.buffer:
             u_s -= use_s
         return round(u_f,self.round), round(u_m,self.round), round(u_s,self.round)
+    """
 
+    def get_adjusted_fms_int(self, f, m, s):
+        use_f,use_m,use_s = self._F, self._M, self._S
+        bfr = 0
+        u_f,u_m,u_s = f,m,s       
+        if self.padded:
+            u_f,u_m,u_s = f+self.buffer,m+self.buffer,s+self.buffer
+            bfr = self.buffer                                              
+        while u_f < 0 + bfr:
+            u_f += use_f
+        while u_f > use_f-1 + bfr:
+            u_f -= use_f
+        # Unit wrap M
+        while u_m < 0 + bfr:
+            u_m += use_m
+        while u_m > use_m-1 + bfr:
+            u_m -= use_m
+        # Unit wrap S
+        while u_s < 0 + bfr:
+            u_s += use_s
+        while u_s > use_s-1 + bfr:
+            u_s -= use_s
+        return round(u_f,self.round), round(u_m,self.round), round(u_s,self.round)
+    
+    """
     def get_adjusted_fms(self, f, m, s,F=-1,M=-1,S=-1):                
         use_f,use_m,use_s = self._F, self._M, self._S
         if F+M+S != -3:
             use_f,use_m,use_s = F,M,S        
         u_f,u_m,u_s = f,m,s        
-        addon = 0        
-        while u_f < 0+addon:
+         
+        while u_f < 0:
             u_f += use_f
-        while u_f >= use_f:
-            u_f -= use_f
+        while u_f > use_f-1:
+            u_f -= use_f-1
         # Unit wrap M
-        while u_m < 0+addon:
+        while u_m < 0:
             u_m += use_m
-        while u_m >= use_m:
-            u_m -= use_m
+        while u_m > use_m-1:
+            u_m -= use_m-1
         # Unit wrap S
-        while u_s < 0+addon:
+        while u_s < 0:
             u_s += use_s
-        while u_s >= use_s:
-            u_s -= use_s
-        return round(u_f,self.round), round(u_m,self.round), round(u_s,self.round)
-        
+        while u_s > use_s-1:
+            u_s -= use_s-1
+        return round(u_f,self.round), round(u_m,self.round), round(u_s,self.round)        
+    """
+
     def get_fms_from_pos(self, A):        
         f,m,c = 0,0,0
         left = A
@@ -272,8 +309,8 @@ class Interpolator(ABC):
                 yp = np.floor(round(y,self.round)+j)
                 for k in range(int(-1*width/2 + 1), int(width/2 + 1)):          
                     zp = np.floor(round(z,self.round)+k)            
-                    u_f, u_m, u_s = self.get_adjusted_fms(xp, yp, zp)
-                    p = self.get_fms(u_f, u_m, u_s)
+                    #u_f, u_m, u_s = self.get_adjusted_fms_int(xp, yp, zp)
+                    p = self.get_fms(xp, yp, zp)
                     #print(xp,yp,zp)
                     #vals.append(p)                    
                     arr[count] = p
@@ -306,18 +343,26 @@ class Interpolator(ABC):
 class Nearest(Interpolator):                
     def init(self):
         pass
+    
+    #@njit(fastmath=True)
     def get_value(self, x, y, z):
-        closest_pnt = self.closest(v3.VectorThree(x,y,z))  
-        #print(closest_pnt.A, closest_pnt.B,closest_pnt.C)
-        u_f, u_m, u_s = self.get_adjusted_fms(closest_pnt.A, closest_pnt.B,closest_pnt.C)
-        return self.get_fms(u_f, u_m, u_s)
-    ## implement abstract interface #########################################
+        closest_pnt = self.closest(v3.VectorThree(x,y,z))          
+        u_f, u_m, u_s = self.get_adjusted_fms_int(closest_pnt.A, closest_pnt.B,closest_pnt.C)
+        return self.get_fms(u_f, u_m, u_s)        
+        #u_f, u_m, u_s = self.get_adjusted_fms(x, y, z)
+        #interp = RegularGridInterpolator((self._linx, self._liny, self._linz), self._npy,method="nearest")
+        #pts = np.array([u_f, u_m, u_s])
+        #vals = interp(pts)
+        #return vals[0]
+    
+    ## implement abstract interface #########################################        
     def get_radient(self, x, y, z):
         return self.get_radient_numerical(x,y,z)
     
     def get_laplacian(self, x, y, z):
         return self.get_laplacian_numerical(x,y,z)
     ## iplement abstract interface ###########################################
+
 ####################################################################################################
 ### Multivariate - Linear and Cubic
 ####################################################################################################
@@ -337,22 +382,29 @@ class Multivariate(Interpolator):
         self._zfloor = -1
     
     ## implement abstract interface #########################################
+    #@njit(fastmath=True)
     def get_value(self, x, y, z):
-        u_x, u_y, u_z = self.get_adjusted_fms(x,y,z)
-        xn,yn,zn,coeffs = self.make_coeffs(u_x,u_y,u_z)
+        #u_x, u_y, u_z = self.get_adjusted_fms(x,y,z)
+        xn,yn,zn,coeffs = self.make_coeffs(x,y,z)
         return self.get_value_multivariate(zn, yn, xn, coeffs)
-        
+    
+    def get_radientx(self, x, y, z):
+        return self.get_radient_numerical(x,y,z)
+    
+    def get_laplacianx(self, x, y, z):
+        return self.get_laplacian_numerical(x,y,z)
+    
     def get_radient(self, x, y, z):
-        u_x, u_y, u_z = self.get_adjusted_fms(x,y,z)
-        xn,yn,zn,coeffs = self.make_coeffs(u_x,u_y,u_z)
+        #u_x, u_y, u_z = self.get_adjusted_fms(x,y,z)
+        xn,yn,zn,coeffs = self.make_coeffs(x,y,z)
         dx = self.get_value_multivariate(zn, yn, xn, coeffs,["x"])
         dy = self.get_value_multivariate(zn, yn, xn, coeffs,["y"])
         dz = self.get_value_multivariate(zn, yn, xn, coeffs,["z"])
         return self.make_radient(dx,dy,dz)
             
     def get_laplacian(self, x, y, z):
-        u_x, u_y, u_z = self.get_adjusted_fms(x,y,z)
-        xn,yn,zn,coeffs = self.make_coeffs(u_x,u_y,u_z)
+        #u_x, u_y, u_z = self.get_adjusted_fms(x,y,z)
+        xn,yn,zn,coeffs = self.make_coeffs(x,y,z)
         ddx = self.get_value_multivariate(zn, yn, xn, coeffs,["x","x"])
         ddy = self.get_value_multivariate(zn, yn, xn, coeffs,["y","y"])
         ddz = self.get_value_multivariate(zn, yn, xn, coeffs,["z","z"])
@@ -360,7 +412,53 @@ class Multivariate(Interpolator):
         
     
     ## iplement abstract interface ###########################################
-               
+    
+    """
+    def get_value_old(self, x, y, z):
+        # The method of linear interpolation is a version of my own method for multivariate fitting, instead of trilinear interpolation
+        # NOTE I could extend this to be multivariate not linear but it has no advantage over bspline - and is slower and not as good 
+        # Document is here: https://rachelalcraft.github.io/Papers/MultivariateInterpolation/MultivariateInterpolation.pdf                        
+        recalc = self.need_new
+        #we can reuse our last matrix if the points are within the same unit cube
+        xFloor = np.floor(x)
+        yFloor = np.floor(y)
+        zFloor = np.floor(z)
+        if not recalc:
+            if (xFloor != self.xfloor):
+                recalc = True
+            if (yFloor != self.yfloor):
+                recalc = True
+            if (zFloor != self.zfloor):
+                recalc = True
+
+        if (recalc):        
+            self.xfloor = np.floor(x)
+            self.yfloor = np.floor(y)
+            self.zfloor = np.floor(z)
+            # 1. Build the points around the centre as a cube - 8 points
+            vals = self.build_cube_around(x, y, z, self.points)
+            #2. Multiply with the precomputed matrix to find the multivariate polynomial
+            ABC = self.mult_vector(self.inv.get_invariant(), vals)
+            # 3. Put the 8 values back into a cube
+            self.polyCoeffs = np.zeros((self.points, self.points, self.points))
+            pos = 0;
+            for i in range(self.points):
+                for j in range(self.points):                
+                    for k in range(self.points):                    
+                        self.polyCoeffs[i, j, k] = ABC[pos]
+                        pos+=1
+            self.need_new = False        
+        #4. Adjust the values to be within this cube
+        pstart = (-1 * self.points / 2) + 1        
+        xn = x - np.floor(x) - pstart
+        yn = y - np.floor(y) - pstart
+        zn = z - np.floor(z) - pstart
+
+        #5. Apply the multivariate polynomial coefficents to find the value
+        #return self.get_value_multivariate(zn, yn, xn, self.polyCoeffs)
+        return self.get_value_multivariate(zn, yn, xn, self.polyCoeffs)
+    """
+        
     def get_value_multivariate(self, x, y, z, coeffs,wrt=[]):        
         #This is using a value scheme that makes sens of our new fitted polyCube
         #In a linear case it will be a decimal between 0 and 1          
@@ -455,24 +553,26 @@ class Bspline(Interpolator):
     """
     def init(self):                
         self.padded = True
-        self.buffer = 12
+        self.buffer = 1
         self.make_periodic_coeffs() 
     ########################################################################
-    ## implement abstract interface #########################################
+    ## implement abstract interface #########################################    
     def get_radient(self, x, y, z):
         return self.get_radient_numerical(x,y,z)
     ########################################################################    
     def get_laplacian(self, x, y, z):
         return self.get_laplacian_numerical(x,y,z)
     ########################################################################
+    #@njit(fastmath=True)
     def get_value(self, x, y, z):
         u_x, u_y, u_z = x,y,z        
         # the values need to be within the buffer zone
         if self.padded:
-            u_x, u_y, u_z = self.get_adjusted_fms_buffered(u_x, u_y, u_z)
-            #print(u_x, u_y, u_z)
-        else:
-            u_x, u_y, u_z = self.get_adjusted_fms(u_x, u_y, u_z)
+            u_x, u_y, u_z = x+self.buffer,y+self.buffer,z+self.buffer
+        #    u_x, u_y, u_z = self.get_adjusted_fms_buffered(u_x, u_y, u_z)
+        #    print(u_x, u_y, u_z,self._coeffs.shape)
+        #else:
+        #    u_x, u_y, u_z = self.get_adjusted_fms(u_x, u_y, u_z)
         weight_length = self.degree + 1
         xIndex, yIndex, zIndex = [],[],[]        
         xWeight, yWeight,zWeight = [],[],[]        
@@ -514,21 +614,25 @@ class Bspline(Interpolator):
         #// RSA edit actually I want to wrap        
         # !!! I have removed the mirror boundary bit, might need to put it back in RSA TODO         
         #Perform interolation            
+        
         spline_degree = self.degree
         w3 = 0.0
         for k in range(spline_degree+1):
+            #strvals = ""
             w2 = 0.0
             for j in range(spline_degree+1):
                 w1 = 0.0
                 for i in range(spline_degree+1):
                     xc,yc,zc = xIndex[i],yIndex[j],zIndex[k]
-                    xc,yc,zc = self.get_adjusted_fms(xc,yc,zc)
+                    xc,yc,zc = self.get_adjusted_fms_int(xc,yc,zc)                    
                     cc = self.get_coeff(xc,yc,zc,self._F,self._M,self._S)
+                    #strvals += "(" + str(xc) + "," + str(yc) + "," + str(zc) + ")=" + str(round(cc,2)) + ", "
                     #print(xIndex[i],yIndex[j],zIndex[k])
                     #print(xc,yc,zc,cc)                    
                     w1 += xWeight[i] * cc
                 w2 += yWeight[j] * w1
             w3 += zWeight[k] * w2
+            #print(strvals)
         return w3
     ## iplement abstract interface ###########################################
     ########################################################################
@@ -541,7 +645,9 @@ class Bspline(Interpolator):
             self.simple_copy_coeffs()            
             self.create_coeffs(self._F,self._M,self._S)                    
         else:
-            self._coeffs =self.extend_vals_with_buffer(self.buffer)            
+            self.padded = False
+            self._coeffs =self.extend_vals_with_buffer(self.buffer)
+            self.padded = True
             self.create_coeffs(self._F,self._M,self._S)        
                                     
     def reduce_vals_with_buffer(self,buffer, mynpy):        
@@ -557,40 +663,40 @@ class Bspline(Interpolator):
         for z in range(buffer):
             for y in range(-1*buffer, self._M+buffer):
                 for x in range(-1*buffer, self._F+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
+                    #u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
+                    p = self.get_fms(x-buffer,y-buffer,z-buffer)
                     padded[x,y,z] = p                            
         for z in range(zza,zza+buffer):
             for y in range(-1*buffer, self._M+buffer):
                 for x in range(-1*buffer, self._F+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
+                    #u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
+                    p = self.get_fms(x-buffer,y-buffer,z-buffer)
                     padded[x,y,z] = p                                            
         # pad y
         for y in range(buffer):
             for z in range(-1*buffer, self._S+buffer):
                 for x in range(-1*buffer, self._F+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
+                    #u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
+                    p = self.get_fms(x-buffer,y-buffer,z-buffer)
                     padded[x,y,z] = p                            
         for y in range(yya,yya+buffer):
             for z in range(-1*buffer, self._S+buffer):
                 for x in range(-1*buffer, self._F+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
+                    #u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
+                    p = self.get_fms(x-buffer,y-buffer,z-buffer)
                     padded[x,y,z] = p                                    
         # pad x
         for x in range(buffer):
             for z in range(-1*buffer, self._S+buffer):
                 for y in range(-1*buffer, self._M+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
+                    #u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
+                    p = self.get_fms(x-buffer,y-buffer,z-buffer)
                     padded[x,y,z] = p                            
         for x in range(xxa,xxa+buffer):
             for z in range(-1*buffer, self._S+buffer):
                 for y in range(-1*buffer, self._M+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
+                    #u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
+                    p = self.get_fms(x-buffer,y-buffer,z-buffer)
                     padded[x,y,z] = p                                    
         
         
@@ -603,27 +709,31 @@ class Bspline(Interpolator):
         lmbda = 1                
         for k in range(num_poles):
             lmbda = lmbda * (1 - pole[k]) * (1 - 1 / pole[k])
+                
         #Convert the samples to interpolation coefficients
         #X-wise
         if thisF > 1:
             for y in range(thisM):        
                 for z in range(thisS):        
                     row = self.get_row3d(y, z, thisF,thisF, thisM, thisS)
-                    line = self.convert_to_interp_coeffs(pole, num_poles, thisF, row,lmbda)
+                    line = self.convert_to_interp_coeffs_old(pole, num_poles, thisF, row,lmbda)
+                    #line = self.convert_to_interp_coeffs(pole, num_poles, thisF, [y,z,"YZ"],lmbda)
                     self.put_row3d(y, z, line, thisF,thisF, thisM, thisS)                
         #Y-wise
         if thisM > 1:
             for x in range(thisF):        
                 for z in range(thisS):        
                     row = self.get_col3d(x, z, thisM,thisF, thisM, thisS)
-                    line = self.convert_to_interp_coeffs(pole, num_poles, thisM, row,lmbda)
+                    line = self.convert_to_interp_coeffs_old(pole, num_poles, thisM, row,lmbda)
+                    #line = self.convert_to_interp_coeffs(pole, num_poles, thisF, [x,z,"XZ"],lmbda)
                     self.put_col3d(x, z, line, thisM,thisF, thisM, thisS)                           
         #Z-wise
         if thisS > 1:
             for x in range(thisF):
                 for y in range(thisM):        
                     row = self.get_hole3d(x, y, thisS,thisF, thisM, thisS)
-                    line = self.convert_to_interp_coeffs(pole, num_poles, thisS, row,lmbda)
+                    line = self.convert_to_interp_coeffs_old(pole, num_poles, thisS, row,lmbda)
+                    #line = self.convert_to_interp_coeffs(pole, num_poles, thisF, [x,y,"XY"],lmbda)
                     self.put_hole3d(x, y, line, thisS,thisF, thisM, thisS)
                                                             
     def get_pole(self,degree):        
@@ -675,7 +785,58 @@ class Bspline(Interpolator):
         for z in range(length):
             self.put_coeff(x, y, z, bore[z],F,M,S)
     
-    def convert_to_interp_coeffs(self,pole, num_poles, width, row,lmbda):
+    def convert_to_interp_coeffs(self,pole, num_poles, width,row_details,lmbda):
+        #/* special case required by mirror boundaries */                
+        #Apply the gain
+        i,j,plane = row_details
+        for n in range(width):
+            #row[n] = row[n] * lmbda        
+            if plane == "XY":
+                self._coeffs[i,j,n] = self._coeffs[i,j,n] * lmbda
+            elif plane == "YZ":
+                self._coeffs[n,i,j] = self._coeffs[n,i,j] * lmbda
+            else: #XZ
+                self._coeffs[i,n,j] = self._coeffs[i,n,j] * lmbda
+        #loop over the poles            
+        for k in range(num_poles):        
+            #/* causal initialization */            
+            #row[0] = self.initial_causal_coeffs(row, width, pole[k])            
+            if plane == "XY":
+                self._coeffs[i,j,0] = self.initial_causal_coeffs(row_details, width, pole[k])
+            elif plane == "YZ":
+                self._coeffs[0,i,j] = self.initial_causal_coeffs(row_details, width, pole[k])
+            else: #XZ
+                self._coeffs[i,0,j] = self.initial_causal_coeffs(row_details, width, pole[k])
+            #/* causal recursion */
+            for n in range(1,width):            
+                #row[n] = row[n]+ pole[k] * row[n - 1]
+                if plane == "XY":
+                    self._coeffs[i,j,n] = self._coeffs[i,j,n] + pole[k] + self._coeffs[i,j,n-1]
+                elif plane == "YZ":
+                    self._coeffs[n,i,j] = self._coeffs[n,i,j] + pole[k] + self._coeffs[n-1,i,j]
+                else: #XZ
+                    self._coeffs[i,n,j] = self._coeffs[i,n,j] + pole[k] + self._coeffs[i,n-1,j]
+            #/* anticausal initialization */                        
+            #row[width - 1] = self.initial_anticausal_coeffs(row, width, pole[k])
+            if plane == "XY":
+                self._coeffs[i,j,width-1] = self.initial_anticausal_coeffs(row_details, width, pole[k])
+            elif plane == "YZ":
+                self._coeffs[width-1,i,j] = self.initial_anticausal_coeffs(row_details, width, pole[k])
+            else: #XZ
+                self._coeffs[i,width-1,j] = self.initial_anticausal_coeffs(row_details, width, pole[k])
+            
+            #/* anticausal recursion */            
+            for n in range(width - 2, -1, -1):
+                #row[n] = pole[k] * (row[n + 1] - row[n])
+                if plane == "XY":
+                    self._coeffs[i,j,n] = pole[k] * (self._coeffs[i,j,n+1] - self._coeffs[i,j,n])
+                elif plane == "YZ":
+                    self._coeffs[n,i,j] = pole[k] * (self._coeffs[n+1,i,j] - self._coeffs[n,i,j])
+                else: #XZ
+                    self._coeffs[i,n,j] = pole[k] * (self._coeffs[i,n+1,j] - self._coeffs[i,n,j])
+        #return row
+
+    def convert_to_interp_coeffs_old(self,pole, num_poles, width, row,lmbda):
         #/* special case required by mirror boundaries */                
         #Apply the gain
         for n in range(width):
@@ -683,13 +844,13 @@ class Bspline(Interpolator):
         #loop over the poles            
         for k in range(num_poles):        
             #/* causal initialization */            
-            row[0] = self.initial_causal_coeffs(row, width, pole[k])            
+            row[0] = self.initial_causal_coeffs_old(row, width, pole[k])            
             #row[0] = row[0]+ pole[k] * row[width-1]
             #/* causal recursion */
             for n in range(1,width):            
                 row[n] = row[n]+ pole[k] * row[n - 1]
             #/* anticausal initialization */                        
-            row[width - 1] = self.initial_anticausal_coeffs(row, width, pole[k])
+            row[width - 1] = self.initial_anticausal_coeffs_old(row, width, pole[k])
             ##row[width - 1] = ((pole[k] / (pole[k] * pole[k] - 1.0)) * (pole[k] * row[width - 2] + row[width - 1]))
             #row[width-1] = pole[k] * (row[0] - row[width-1])
             #/* anticausal recursion */            
@@ -697,7 +858,64 @@ class Bspline(Interpolator):
                 row[n] = pole[k] * (row[n + 1] - row[n])
         return row
         
-    def initial_causal_coeffs(self, vals, length, pole):
+    def initial_causal_coeffs(self, row_details, length, pole):
+        i,j,plane = row_details
+
+        #/* begin InitialCausalCoefficient */
+        Sum, zn, z2n, iz = 0.,0.,0.,0.        
+        #/* this initialization corresponds to mirror boundaries */
+        Horizon = length
+        if (self.TOLERANCE > 0.0):        
+            Horizon = np.ceil(np.log(self.TOLERANCE) / np.log(abs(pole)))
+        if (Horizon < length):        
+            #/* accelerated loop */
+            zn = pole
+            #Sum = vals[0]            
+            if plane == "XY":
+                Sum = self._coeffs[i,j,0] 
+            elif plane == "YZ":
+                Sum = self._coeffs[0,i,j] 
+            else:
+                Sum = self._coeffs[i,0,j] #XZ
+                        
+            for n in range(1,int(Horizon)):
+                #Sum += zn * vals[n]                
+                if plane == "XY":
+                    Sum = zn * self._coeffs[i,j,n] 
+                elif plane == "YZ":
+                    Sum = zn * self._coeffs[n,i,j] 
+                else:#XZ
+                    Sum = zn * self._coeffs[i,n,j] 
+                zn *= pole       
+            return Sum        
+        else:#// if (_mirror)
+            #// RSA notes is this a mirror condition? when the horizon - how far you need to look ahead for good data - is not as far the data you have
+            #/* full loop */
+            zn = pole
+            iz = 1.0 / pole
+            z2n = math.pow(pole, length - 1)
+            #Sum = vals[0] + z2n * vals[length - 1]            
+            if plane == "XY":
+                Sum = self._coeffs[i,j,0]+z2n*self._coeffs[i,j,length-1] 
+            elif plane == "YZ":
+                Sum = self._coeffs[0,i,j]+z2n*self._coeffs[length-1,i,j] 
+            else:
+                Sum = self._coeffs[i,0,j]+z2n*self._coeffs[i,length-1,j] #XZ
+
+            z2n *= z2n * iz 
+            for n in range(1,length - 1):
+                #Sum += (zn + z2n) * vals[n]                 
+                if plane == "XY":
+                    Sum = (zn + z2n) * self._coeffs[i,j,n] 
+                elif plane == "YZ":
+                    Sum = (zn + z2n) * self._coeffs[n,i,j] 
+                else:#XZ
+                    Sum = (zn + z2n) * self._coeffs[i,n,j] 
+                zn *= pole                
+                z2n *= iz
+            return (Sum / (1.0 - zn * zn))        
+    
+    def initial_causal_coeffs_old(self, vals, length, pole):
         #/* begin InitialCausalCoefficient */
         Sum, zn, z2n, iz = 0.,0.,0.,0.
         n, Horizon = 0,0
@@ -727,7 +945,21 @@ class Bspline(Interpolator):
                 z2n *= iz
             return (Sum / (1.0 - zn * zn))        
                 
-    def initial_anticausal_coeffs(self, vals, length, pole):        
+    def initial_anticausal_coeffs(self, row_details, length, pole):
+        #/* this initialization corresponds to mirror boundaries */
+        i,j,plane = row_details
+        if (length < 2):
+            return 0;
+        else:#// if (_mirror)
+            #return ((pole / (pole * pole - 1.0)) * (pole * vals[length - 2] + vals[length - 1]))
+            if plane == "XY":
+                return ((pole / (pole * pole - 1.0)) * (pole * self._coeffs[i,j,length-2] + self._coeffs[i,j,length-1]))                
+            elif plane == "YZ":
+                return ((pole / (pole * pole - 1.0)) * (pole * self._coeffs[length-2,i,j] + self._coeffs[length-1,i,j]))                                
+            else:#XZ
+                return ((pole / (pole * pole - 1.0)) * (pole * self._coeffs[i,length-2,j] + self._coeffs[i,length-1,j]))                                
+                        
+    def initial_anticausal_coeffs_old(self, vals, length, pole):        
         #/* this initialization corresponds to mirror boundaries */
         if (length < 2):
             return 0;
@@ -834,8 +1066,11 @@ class Bspline(Interpolator):
         return ws
         
 ####################################################################################################
-### R-Spline
-#################################################################################################### 
+
+    
+
+    
+            
         
         
         
