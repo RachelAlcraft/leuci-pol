@@ -16,9 +16,9 @@ from leuci_xyz import vectorthree as v3
 
 ########## INPUTS #################
 degree = 3
-#test_methods = ["nearest","linear","cubic"]
-#test_methods = ["nearest","linear","cubic","bspline","rspline"]
-test_methods = ["nearest","mv1","linear","mv3","bspline"]
+#test_methods = ["nearest","linear","cubic","bspline"]
+test_methods = ["nearest","mv0","mv1","linear","mv3","bspline"]
+#test_methods = ["bspline"]
 ###################################
 for interp_method in test_methods:
     print("############# Testing", interp_method, "########################")    
@@ -28,11 +28,12 @@ for interp_method in test_methods:
     
     f,m,s = len(vals),len(vals[0]),len(vals[0][0])
     # simplest creation of an interpolator, add values, specify the axis, ask for a value
-    intr = pol.create_interpolator(interp_method,vals,F=f,M=m,S=s,log_level=1,degree=degree)    
-    all_once = False
+    intr = pol.create_interpolator(interp_method,vals,F=f,M=m,S=s,log_level=1)    
+    all_once = True
     if all_once:
-        pnts = [(0,0,0),(0,0,1),(0,1,0),(0,1,1),(1,0,0),(1,0,1),(1,1,0),(1,1,1),(-0.5,-0.5,-0.5),(-1,-1,-1),(2,2,2)]
+        pnts = [(0,0,0),(0,0,1),(0,1,0),(0,1,1),(1,0,0),(1,0,1),(1,1,0),(1,1,1),(0.5,0.5,0.5),(-0.5,-0.5,-0.5),(-1,-1,-1),(2,2,2)]
         vals = intr.get_values(pnts)
+        print(vals)
         print("1 =",vals[0]) 
         print("2 =",vals[1]) 
         print("3 =",vals[2]) 
@@ -41,9 +42,10 @@ for interp_method in test_methods:
         print("6 =",vals[5]) 
         print("7 =",vals[6]) 
         print("8 =",vals[7]) 
-        print("-0.5 =",vals[8])   
-        print("8(-1) =",vals[9]) 
-        print("1(2) =",vals[10]) 
+        print("0.5 =",vals[8])   
+        print("-0.5 =",vals[9])   
+        print("8(-1) =",vals[10]) 
+        print("1(2) =",vals[11]) 
     else:    
         print("1 =", intr.get_value(0,0,0)) 
         print("2 =", intr.get_value(0,0,1)) 

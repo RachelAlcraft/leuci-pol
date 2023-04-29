@@ -20,8 +20,9 @@ if True:
   ########## INPUTS #################
   degree = 3  
   test_methods = ["nearest","linear","cubic","bspline"]
-  #test_methods = ["cubic","bspline"]
-  width=5
+  test_methods = ["nearest","linear","mv0","mv1","cubic","bspline"]
+  #test_methods = ["cubic"]
+  width=20
   samples=61
   ###################################
   ## GRID ##
@@ -47,7 +48,7 @@ if True:
       #vals = [[[1,2],[3,4]],[[5,6],[7,8]]]
       vals = [[[1,2,3,4,5],[6,7,8,9,10]],[[11,12,13,14,15],[16,17,18,19,20]]]      
       f,m,s = len(vals),len(vals[0]),len(vals[0][0])    
-      intr = pol.create_interpolator(interp_method,vals,F=f,M=m,S=s,log_level=1,degree=degree)    
+      intr = pol.create_interpolator(interp_method,vals,F=f,M=m,S=s,log_level=1)
       print("---creating values", datetime.datetime.now())
       dvals = intr.get_val_slice(xyz_coords,deriv=0)      
       rvals = intr.get_val_slice(xyz_coords,deriv=1)

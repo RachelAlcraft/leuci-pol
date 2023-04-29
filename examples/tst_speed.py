@@ -28,14 +28,16 @@ def speed_test():
     ########## INPUTS #################
     
     #pdb_codes = ["6eex","1ejg"]
-    interp_methods = ["nearest","linear","mv1","cubic","bspline"]
+    interp_methods = ["nearest","mv0","linear","mv1","cubic","bspline"]
     #derivs = [0,1,2]
-    pdb_codes = ["6eex"]    
-    #interp_methods = ["bspline"]
+    pdb_codes = ["1ejg"]    
+    #interp_methods = ["linear","mv1","linear","mv1"]
+    #interp_methods = ["nearest","mv0","linear","mv1"]
+    #interp_methods = ["cubic"]
     derivs = [0,1,2]
     ###############################
     width=8
-    samples=11    
+    samples=51    
     degree = 3   
     ########## EXAMPLE #################
     for pdb_code in pdb_codes:
@@ -63,20 +65,20 @@ def speed_test():
         for interp_method in interp_methods:
             t0 = datetime.datetime.now()                       
             print("=============",interp_method,pdb_code,"=================")
-            mf = mfun.MapFunctions(pdb_code,po.mobj,po.pobj,interp_method,degree=degree)
+            mf = mfun.MapFunctions(pdb_code,po.mobj,po.pobj,interp_method)
             print("Interper=",interp_method,degree,datetime.datetime.now()-t1)
 
             for deriv in derivs:    
                 t1 = datetime.datetime.now()
                 if deriv == 0:
                     vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=0)
-                    print("Density=",interp_method,datetime.datetime.now()-t1)
+                    print("Density=",interp_method,datetime.datetime.now()-t1)#,vals[0])
                 elif deriv == 1:
                     vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=1)
-                    print("Radient=",interp_method,datetime.datetime.now()-t1)
+                    print("Radient=",interp_method,datetime.datetime.now()-t1)#,vals[0])
                 elif deriv == 2:        
                     vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=2)
-                    print("Laplacian=",interp_method,datetime.datetime.now()-t1)
+                    print("Laplacian=",interp_method,datetime.datetime.now()-t1)#,vals[0])
             
             t1 = datetime.datetime.now()                
             print("Total=",interp_method,pdb_code,datetime.datetime.now()-t0)
@@ -86,8 +88,8 @@ def speed_test():
 ###############################################################################################################
 ## PROFILER ##
 import cProfile
-cProfile.run('speed_test()')
-#speed_test()
+#cProfile.run('speed_test()')
+speed_test()
                 
                 
 

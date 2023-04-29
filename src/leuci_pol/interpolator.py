@@ -16,24 +16,28 @@ from . import iv5
 
 
 ### Factory method for creation ##############################################################
-def create_interpolator(method, values, F, M, S, npy=None,degree=-1, log_level=0):
+def create_interpolator(method, values, F, M, S, log_level=0,degree=-1):
     if log_level > 0:
-        print("Interpolator:",method,F,M,S,"degree=",degree)
+        print("Interpolator:",method,F,M,S)
     intr = None
-    if method == "linear":
-        intr = Multivariate(values,F, M, S,1, log_level)
-    ## DEGREE 5 explicitly ##
-    elif method == "cubic" and degree == 5: #not really cubic, but quintic
-        intr = Multivariate(values,F, M, S,5, log_level)
-    elif method == "bspline" and degree == 5:
-        intr = Bspline(values,F, M, S, 5, log_level) # I am being cautious about degrees
-    ### degree 3 ###
-    elif method == "cubic":
-        intr = Multivariate(values,F, M, S,3, log_level)        
-    elif method == "bspline":
+    if method == "nearest":
+        intr = Numpest(values,F, M, S,1, log_level)    
+    elif method == "mv0":
+        intr = Nearest(values,F, M, S,1, log_level)
+    elif method == "linear":
+        intr = Linear(values,F, M, S,1, log_level)
+    elif method == "mv1":
+        intr = Multivariate(values,F, M, S,1,log_level)
+    elif method == "mv3" or method == "cubic":
+        intr = Multivariate(values,F, M, S,3,log_level)
+    elif method == "mv5" or method == "quintic":
+        intr = Multivariate(values,F, M, S,5,log_level)    
+    elif method == "bspline5":
+        intr = Bspline(values,F, M, S, 5, log_level) # I am being cautious about degrees    
+    elif method == "bspline":### degree 3 by default ###    
         intr = Bspline(values,F, M, S,3, log_level) 
-    else: #nearest is default
-        intr = Nearest(values,F, M, S,0,log_level)
+    else: 
+        raise(Exception("Method not known " + method))
     intr.init()
     return intr
 
@@ -55,16 +59,62 @@ class Interpolator(ABC):
     @abstractmethod
     def get_value(self, x, y, z):
         pass
-    
+    @abstractmethod
+    def get_values(self, xyz):
+        pass    
     @abstractmethod
     def get_radient(self, x, y, z):
         pass
-    
+    @abstractmethod
+    def get_radients(self, xyz):
+        pass    
     @abstractmethod
     def get_laplacian(self, x, y, z):
+        pass    
+    @abstractmethod
+    def get_laplacians(self, xyz):
         pass
     ############################################################################################################
     # implemented interface that is the same for all abstractions
+    def adj_values_list(self, xyz):
+        xyz2 = []
+        for x,y,z in xyz:
+            u_f,u_m,u_s = self.get_adjusted_fms(x,y,z)
+            xyz2.append((u_f,u_m,u_s))
+        return xyz2
+    
+    def get_values_list(self, xyz):                        
+        xyz = self.adj_values_list(xyz)
+        vals = []
+        for x,y,z in xyz:            
+            val = self.get_value(x,y,z)
+            vals.append(val)
+        return vals
+    
+    def get_radients_list_numerical(self, xyz):                                
+        xyz = self.get_radients_extended_list(xyz)
+        xyz_vals = self.get_values(xyz)        
+        vals = []
+        for i in range(0,len(xyz),4):
+            val = xyz_vals[i]
+            dx = (xyz_vals[i+1] - val) / self.h
+            dy = (xyz_vals[i+2] - val) / self.h
+            dz = (xyz_vals[i+3] - val) / self.h        
+            vals.append(self.make_radient(dx,dy,dz))
+        return vals
+    
+    def get_laplacians_list_numerical(self, xyz):
+        xyz = self.get_laplacians_extended_list(xyz)
+        xyz_vals = self.get_values(xyz)  
+        vals = []
+        for i in range(0,len(xyz),7):
+            val = xyz_vals[i]
+            d2x = (xyz_vals[i+1] + xyz_vals[i+2] - 2 * val) / (self.h * self.h)
+            d2y = (xyz_vals[i+3] + xyz_vals[i+4] - 2 * val) / (self.h * self.h)
+            d2z = (xyz_vals[i+5] + xyz_vals[i+6] - 2 * val) / (self.h * self.h)                
+            vals.append(self.make_laplacian(d2x,d2y,d2z))
+        return vals
+
     def make_radient(self,dx,dy,dz):
         radient = abs(dx) + abs(dy) + abs(dz)
         #radient = dx+dy+dz                                
@@ -74,7 +124,42 @@ class Interpolator(ABC):
         laplacian = ddx + ddy + ddz 
         return laplacian
 
-    def get_radient_numerical(self, x, y, z):                        
+    def get_radients_extended_list(self, xyz):
+        vals_ext = []
+        for x,y,z in xyz:
+            x,y,z = self.get_adjusted_fms(x,y,z)            
+            xx,xy,xz = x + self.h, y, z
+            yx,yy,yz = x, y + self.h, z
+            zx,zy,zz = x, y, z + self.h
+            vals_ext.append([x,y,z])
+            vals_ext.append([xx,xy,xz])
+            vals_ext.append([yx,yy,yz])
+            vals_ext.append([zx,zy,zz])
+        return vals_ext
+    
+    def get_laplacians_extended_list(self, xyz):
+        vals_ext = []
+        for x,y,z in xyz:
+            x,y,z = self.get_adjusted_fms(x,y,z)                  
+            xmx,xmy,xmz = x - self.h, y, z
+            xpx,xpy,xpz = x + self.h, y, z            
+            ymx,ymy,ymz = x, y - self.h, z
+            ypx,ypy,ypz = x, y + self.h, z
+            zmx,zmy,zmz = x, y, z - self.h
+            zpx,zpy,zpz = x, y, z + self.h            
+            vals_ext.append([x,y,z])
+            vals_ext.append([xmx,xmy,xmz])
+            vals_ext.append([xpx,xpy,xpz])
+            vals_ext.append([ymx,ymy,ymz])
+            vals_ext.append([ypx,ypy,ypz])
+            vals_ext.append([zmx,zmy,zmz])
+            vals_ext.append([zpx,zpy,zpz])
+        return vals_ext
+            
+
+
+    def get_radient_numerical(self, x, y, z):
+        x,y,z = self.get_adjusted_fms(x,y,z)
         val = self.get_value(x, y, z)
         dx = (self.get_value(x + self.h, y, z) - val) / self.h
         dy = (self.get_value(x, y + self.h, z) - val) / self.h
@@ -82,6 +167,7 @@ class Interpolator(ABC):
         return self.make_radient(dx,dy,dz)
         
     def get_laplacian_numerical(self, x, y, z):        
+        x,y,z = self.get_adjusted_fms(x,y,z)
         val = self.get_value(x, y, z)
         xx = self.getDxDx_numerical(x, y, z, val)
         yy = self.getDyDy_numerical(x, y, z, val)
@@ -241,23 +327,32 @@ class Interpolator(ABC):
                     cnrs.append(v3.VectorThree(x+f,y+m,z+s)) 
         return cnrs
     
-    def get_val_slice(self,unit_coords, deriv = 0):
-        vals = []
-        for i in range(len(unit_coords)):
-            row = []
-            for j in range(len(unit_coords[0])):
-                vec = unit_coords[i][j]
-                if self.log_level > 2:
-                    print("Get value", vec.A,vec.B,vec.C)
-                if deriv == 2:
-                    vec_val = self.get_laplacian(vec.A,vec.B,vec.C)
-                elif deriv == 1:
-                    vec_val = self.get_radient(vec.A,vec.B,vec.C)
-                else:
-                    vec_val = self.get_value(vec.A,vec.B,vec.C)
-                row.append(vec_val)
-            vals.append(row)
-        return vals
+    def get_val_slice(self,unit_coords, deriv = 0):        
+        vals = []                
+        if True:
+            coords = []
+            for i in range(len(unit_coords)):
+                row = []
+                for j in range(len(unit_coords[0])):
+                    vec = unit_coords[i][j]
+                    coords.append([vec.A,vec.B,vec.C])
+            if deriv == 2:
+                vals = self.get_laplacians(coords)
+            elif deriv == 1:
+                vals = self.get_radients(coords)
+            else:
+                vals = self.get_values(coords)            
+            # put back into shape
+            vals_grid = []
+            count = 0
+            for i in range(len(unit_coords)):
+                row = []
+                for j in range(len(unit_coords[0])):
+                    row.append(vals[count])
+                    count += 1
+                vals_grid.append(row)
+            return vals_grid
+        
 
     def build_cube_around(self, x, y, z, width):        
         # 1. Build the points around the centre as a cube - width points
@@ -299,25 +394,182 @@ class Interpolator(ABC):
                 results.append(sum)
             return results
     
-
+    def extend_vals_with_buffer(self,buffer):        
+        #// 1. Make a buffer padded values cube for periodic values        
+        #print(self._npy)
+        xxa,yya,zza = self._F, self._M, self._S
+        padded = np.pad(self._npy,[(buffer,buffer),(buffer,buffer),(buffer,buffer)])        
+        #print("-----------------------")
+        #print(padded)
+        # pad z
+        for z in range(-1*buffer,0):
+            for y in range(-1*buffer, self._M+buffer):
+                for x in range(-1*buffer, self._F+buffer):
+                    b_x, b_y, b_z = x+buffer, y+buffer, z+buffer
+                    u_f, u_m, u_s = self.get_adjusted_fms(x,y,z)
+                    p = self.get_fms(u_f, u_m, u_s)
+                    padded[b_x, b_y, b_z] = p
+        for z in range(zza,zza+buffer):
+            for y in range(-1*buffer, self._M+buffer):
+                for x in range(-1*buffer, self._F+buffer):
+                    b_x, b_y, b_z = x+buffer, y+buffer, z+buffer
+                    u_f, u_m, u_s = self.get_adjusted_fms(x,y,z)
+                    p = self.get_fms(u_f, u_m, u_s)
+                    padded[b_x, b_y, b_z] = p
+        # pad y
+        for y in range(-1*buffer,0):
+            for z in range(-1*buffer, self._S+buffer):
+                for x in range(-1*buffer, self._F+buffer):
+                    b_x, b_y, b_z = x+buffer, y+buffer, z+buffer
+                    u_f, u_m, u_s = self.get_adjusted_fms(x,y,z)
+                    p = self.get_fms(u_f, u_m, u_s)
+                    padded[b_x, b_y, b_z] = p
+        for y in range(yya,yya+buffer):
+            for z in range(-1*buffer, self._S+buffer):
+                for x in range(-1*buffer, self._F+buffer):
+                    b_x, b_y, b_z = x+buffer, y+buffer, z+buffer
+                    u_f, u_m, u_s = self.get_adjusted_fms(x,y,z)
+                    p = self.get_fms(u_f, u_m, u_s)
+                    padded[b_x, b_y, b_z] = p
+        # pad x
+        for x in range(-1*buffer,0):
+            for z in range(-1*buffer, self._S+buffer):
+                for y in range(-1*buffer, self._M+buffer):
+                    b_x, b_y, b_z = x+buffer, y+buffer, z+buffer
+                    u_f, u_m, u_s = self.get_adjusted_fms(x,y,z)
+                    p = self.get_fms(u_f, u_m, u_s)
+                    padded[b_x, b_y, b_z] = p
+        for x in range(xxa,xxa+buffer):
+            for z in range(-1*buffer, self._S+buffer):
+                for y in range(-1*buffer, self._M+buffer):
+                    b_x, b_y, b_z = x+buffer, y+buffer, z+buffer
+                    u_f, u_m, u_s = self.get_adjusted_fms(x,y,z)
+                    p = self.get_fms(u_f, u_m, u_s)
+                    padded[b_x, b_y, b_z] = p
+        #print("-----------------------")
+        #print(padded)
+        return padded            
 ####################################################################################################
 ### NEAREST NEIGHBOUR
 ####################################################################################################
 class Nearest(Interpolator):                
     def init(self):
         pass
+    ## implement abstract interface #########################################
     def get_value(self, x, y, z):
         closest_pnt = self.closest(v3.VectorThree(x,y,z))  
         #print(closest_pnt.A, closest_pnt.B,closest_pnt.C)
         u_f, u_m, u_s = self.get_adjusted_fms(closest_pnt.A, closest_pnt.B,closest_pnt.C)
         return self.get_fms(u_f, u_m, u_s)
+            
+    def get_radient(self, x, y, z):
+        return 0
+    
+    def get_laplacian(self, x, y, z):
+        return 0
+
+    def get_values(self, xyz):                
+        return self.get_values_list(xyz)
+
+    def get_radients(self, xyz):
+        vals = []
+        for x,y,z in xyz:
+            vals.append(0)
+        return vals
+        
+    def get_laplacians(self, xyz):
+        vals = []
+        for x,y,z in xyz:
+            vals.append(0)
+        return vals
+    ## iplement abstract interface ###########################################
+####################################################################################################
+### NUMPY NEAREST
+####################################################################################################
+from scipy.interpolate import RegularGridInterpolator
+class Numpest(Interpolator):                
+    def init(self):
+        #print(self._npy)
+        #print("----------")
+        self._npy =self.extend_vals_with_buffer(1)
+        self.x_volume = np.linspace(-1,self._F,self._F+2)
+        self.y_volume = np.linspace(-1,self._M,self._M+2)
+        self.z_volume = np.linspace(-1,self._S,self._S+2)
+        #print(self._npy)
     ## implement abstract interface #########################################
+    def get_value(self, x, y, z):                
+        u_f, u_m, u_s = self.get_adjusted_fms(x,y,z)
+        fn = RegularGridInterpolator((self.x_volume,self.y_volume,self.z_volume), self._npy,method="nearest")
+        volume_needed = fn(np.array([u_f, u_m, u_s]))[0]
+        #if volume_needed == 19:
+        #    print(19)
+        return volume_needed                
+    
+    def get_radient(self, x, y, z):
+        return 0
+    
+    def get_laplacian(self, x, y, z):
+        return 0
+    
+    def get_values(self, xyz): 
+        xyz = self.adj_values_list(xyz)               
+        fn = RegularGridInterpolator((self.x_volume,self.y_volume,self.z_volume), self._npy,method="nearest")
+        volume_needed = fn(np.array(xyz))
+        return volume_needed
+
+    def get_radients(self, xyz):
+        vals = []
+        for x,y,z in xyz:
+            vals.append(0)
+        return vals
+        
+    def get_laplacians(self, xyz):
+        vals = []
+        for x,y,z in xyz:
+            vals.append(0)
+        return vals
+    ## iplement abstract interface ###########################################        
+####################################################################################################
+### NUMPY LINEAR
+####################################################################################################      
+class Linear(Interpolator):                
+    def init(self):
+        #print(self._npy)
+        #print("----------")
+        self._npy =self.extend_vals_with_buffer(1)
+        self.x_volume = np.linspace(-1,self._F,self._F+2)
+        self.y_volume = np.linspace(-1,self._M,self._M+2)
+        self.z_volume = np.linspace(-1,self._S,self._S+2)
+        #print(self._npy)
+    
+    ## implement abstract interface #########################################
+    def get_value(self, x, y, z):                        
+        u_f, u_m, u_s = self.get_adjusted_fms(x,y,z)
+        fn = RegularGridInterpolator((self.x_volume,self.y_volume,self.z_volume), self._npy)
+        volume_needed = fn(np.array([u_f, u_m, u_s]))[0]
+        return volume_needed
+                    
     def get_radient(self, x, y, z):
         return self.get_radient_numerical(x,y,z)
     
     def get_laplacian(self, x, y, z):
-        return self.get_laplacian_numerical(x,y,z)
-    ## iplement abstract interface ###########################################
+        return 0
+    
+    def get_values(self, xyz):                
+        xyz = self.adj_values_list(xyz)              
+        fn = RegularGridInterpolator((self.x_volume,self.y_volume,self.z_volume), self._npy,method="linear")
+        volume_needed = fn(np.array(xyz))
+        return volume_needed
+
+    def get_radients(self, xyz):
+        return self.get_radients_list_numerical(xyz)
+        
+    def get_laplacians(self, xyz):
+        vals = []
+        for x,y,z in xyz:
+            vals.append(0)
+        return vals
+    ## iplement abstract interface ###########################################        
 ####################################################################################################
 ### Multivariate - Linear and Cubic
 ####################################################################################################
@@ -341,7 +593,7 @@ class Multivariate(Interpolator):
         u_x, u_y, u_z = self.get_adjusted_fms(x,y,z)
         xn,yn,zn,coeffs = self.make_coeffs(u_x,u_y,u_z)
         return self.get_value_multivariate(zn, yn, xn, coeffs)
-        
+            
     def get_radient(self, x, y, z):
         u_x, u_y, u_z = self.get_adjusted_fms(x,y,z)
         xn,yn,zn,coeffs = self.make_coeffs(u_x,u_y,u_z)
@@ -358,7 +610,22 @@ class Multivariate(Interpolator):
         ddz = self.get_value_multivariate(zn, yn, xn, coeffs,["z","z"])
         return self.make_laplacian(ddx,ddy,ddz)
         
-    
+    def get_values(self, xyz):                
+        return self.get_values_list(xyz)
+
+    def get_radients(self, xyz):
+        vals = []
+        for x,y,z in xyz:
+            val = self.get_radient(x,y,z)            
+            vals.append(val)
+        return vals
+        
+    def get_laplacians(self, xyz):
+        vals = []
+        for x,y,z in xyz:
+            val = self.get_laplacian(x,y,z)            
+            vals.append(val)
+        return vals
     ## iplement abstract interface ###########################################
                
     def get_value_multivariate(self, x, y, z, coeffs,wrt=[]):        
@@ -465,6 +732,15 @@ class Bspline(Interpolator):
     def get_laplacian(self, x, y, z):
         return self.get_laplacian_numerical(x,y,z)
     ########################################################################
+    def get_values(self, xyz):                
+        return self.get_values_list(xyz)
+    
+    def get_radients(self, xyz):
+        return self.get_radients_list_numerical(xyz)
+        
+    def get_laplacians(self, xyz):
+        return self.get_laplacians_list_numerical(xyz)
+
     def get_value(self, x, y, z):
         u_x, u_y, u_z = x,y,z        
         # the values need to be within the buffer zone
@@ -541,61 +817,14 @@ class Bspline(Interpolator):
             self.simple_copy_coeffs()            
             self.create_coeffs(self._F,self._M,self._S)                    
         else:
-            self._coeffs =self.extend_vals_with_buffer(self.buffer)            
+            self._coeffs =self.extend_vals_with_buffer(self.buffer)
             self.create_coeffs(self._F,self._M,self._S)        
                                     
     def reduce_vals_with_buffer(self,buffer, mynpy):        
         xx,yy,zz = mynpy.shape
         smnpy = mynpy[buffer:xx-buffer,buffer:yy-buffer,buffer:zz-buffer]
         return smnpy
-        
-    def extend_vals_with_buffer(self,buffer):        
-        #// 1. Make a buffer padded values cube for periodic values        
-        xxa,yya,zza = self._F, self._M, self._S        
-        padded = np.pad(self._npy,[(buffer,buffer),(buffer,buffer),(buffer,buffer)])        
-        # pad z
-        for z in range(buffer):
-            for y in range(-1*buffer, self._M+buffer):
-                for x in range(-1*buffer, self._F+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
-                    padded[x,y,z] = p                            
-        for z in range(zza,zza+buffer):
-            for y in range(-1*buffer, self._M+buffer):
-                for x in range(-1*buffer, self._F+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
-                    padded[x,y,z] = p                                            
-        # pad y
-        for y in range(buffer):
-            for z in range(-1*buffer, self._S+buffer):
-                for x in range(-1*buffer, self._F+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
-                    padded[x,y,z] = p                            
-        for y in range(yya,yya+buffer):
-            for z in range(-1*buffer, self._S+buffer):
-                for x in range(-1*buffer, self._F+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
-                    padded[x,y,z] = p                                    
-        # pad x
-        for x in range(buffer):
-            for z in range(-1*buffer, self._S+buffer):
-                for y in range(-1*buffer, self._M+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
-                    padded[x,y,z] = p                            
-        for x in range(xxa,xxa+buffer):
-            for z in range(-1*buffer, self._S+buffer):
-                for y in range(-1*buffer, self._M+buffer):
-                    u_f, u_m, u_s = self.get_adjusted_fms(x-buffer,y-buffer,z-buffer)
-                    p = self.get_fms(u_f, u_m, u_s)
-                    padded[x,y,z] = p                                    
-        
-        
-        return padded
-                                                                      
+                                                                              
     def create_coeffs(self, thisF, thisM, thisS):
         pole = self.get_pole(self.degree)
         num_poles = len(pole)

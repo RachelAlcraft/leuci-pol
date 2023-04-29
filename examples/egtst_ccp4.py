@@ -8,7 +8,7 @@ Using WSL the show() functions creates an html page on localhost
 ################### USER INPUTS #######################
 which_examples = [1] # could be 0-5
 width = 8           # in angstrom
-samples = 100       # number of sample points along each axis to interpolate
+samples = 50       # number of sample points along each axis to interpolate
 degree = 3
 ########### A description of the examples #############
 examples = []
@@ -21,10 +21,11 @@ examples.append(["Fig01-cubic_v_spline","3u7z",
 
 examples.append(["Fig02-em_6axz","6axz",
                   ["(-0.919,-1.242,7.415)","(-1.53,-2.311,6.507)","(0.261,-0.895,7.258)"],
-                  [("density",2,-1,0.8,0.5,(1,1),"RGB","cubic"),("radient",2,-1,0.8,0.8,(1,2),"BW","cubic"),("laplacian",1,0,0.8,0.5,(1,3),"RB","cubic"),
-                  ("density",2,-1,0.8,0.5,(2,1),"RGB","bspline"),("radient",2,-1,0.8,0.8,(2,2),"BW","bspline"),("laplacian",1,0,0.8,0.5,(2,3),"RB","bspline")],
-                  (2,3),
-                  ("density","radient","laplacian","density","radient","laplacian")])       #0
+                  [("density",2,-1,0.8,0.5,(1,1),"RGB","linear"),("radient",2,-1,0.8,0.8,(1,2),"BW","linear"),("laplacian",1,0,0.8,0.5,(1,3),"RB","linear"),
+                    ("density",2,-1,0.8,0.5,(2,1),"RGB","cubic"),("radient",2,-1,0.8,0.8,(2,2),"BW","cubic"),("laplacian",1,0,0.8,0.5,(2,3),"RB","cubic"),
+                  ("density",2,-1,0.8,0.5,(3,1),"RGB","bspline"),("radient",2,-1,0.8,0.8,(3,2),"BW","bspline"),("laplacian",1,0,0.8,0.5,(3,3),"RB","bspline")],
+                  (3,3),
+                  ("linear","radient","laplacian","cubic","radient","laplacian","spline","radient","laplacian")])       #0
 
 examples.append(["Fig03-em_6eex_cubic","6eex",
                   ["(3.638,8.536,8.108)","(2.894,9.166,9.274)","(4.849,8.296,8.176)"],
@@ -196,6 +197,7 @@ for which_example in which_examples:
   wdth = 2000
   hight = int(wdth * rows/cols)
   fig.write_image(EG_DIR +"eg001_eg_" + plotid + str(degree) + ".jpg",width=wdth,height=hight)
+  fig.write_html(EG_DIR +"eg001_eg_" + plotid + str(degree) + ".html")
   print("#### Created image at", EG_DIR +"eg001_eg_" + plotid +str(degree)+ ".jpg ####")
   dt2 = datetime.datetime.now()
   print("completed in", dt2-dt1)
