@@ -18,13 +18,19 @@ from leuci_xyz import vectorthree as v3
 degree = 3
 #test_methods = ["nearest","linear","cubic","bspline"]
 test_methods = ["nearest","mv0","mv1","linear","mv3","bspline"]
-#test_methods = ["bspline"]
+test_methods = ["bspline"]
 ###################################
 for interp_method in test_methods:
     print("############# Testing", interp_method, "########################")    
     # the 3d data is in a list of values, with the fastest changing axis first, called F, M, S (fast, medium, slow)
     vals = [[[1,2],[3,4]],[[5,6],[7,8]]]
+    #vals = [[[2,1],[1,3]],[[2,2],[2,2]]]
+    
     #vals = [[[1,2,3,4,5],[6,7,8,9,10]],[[11,12,13,14,15],[16,17,18,19,20]]]
+    
+    import numpy as np
+    vals = np.copy(vals).astype(float)
+    print(vals)
     
     f,m,s = len(vals),len(vals[0]),len(vals[0][0])
     # simplest creation of an interpolator, add values, specify the axis, ask for a value

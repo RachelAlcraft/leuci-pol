@@ -50,7 +50,7 @@ class Interpolator(ABC):
         self._S = S
         self.degree = degree        
         self.log_level = log_level         
-        self.h = 0.0001 #this is the interval for numerical differentiation
+        self.h = 0.0001 #this is the interval for numerical differentiation        
         self.padded = False
         self.buffer = 12
         self.round = 12
@@ -79,12 +79,12 @@ class Interpolator(ABC):
     def adj_values_list(self, xyz):
         xyz2 = []
         for x,y,z in xyz:
-            u_f,u_m,u_s = self.get_adjusted_fms(x,y,z)
+            u_f,u_m,u_s = self.get_adjusted_fms_maybe(x,y,z)
             xyz2.append((u_f,u_m,u_s))
         return xyz2
     
     def get_values_list(self, xyz):                        
-        xyz = self.adj_values_list(xyz)
+        #xyz = self.adj_values_list(xyz)
         vals = []
         for x,y,z in xyz:            
             val = self.get_value(x,y,z)
@@ -115,6 +115,20 @@ class Interpolator(ABC):
             vals.append(self.make_laplacian(d2x,d2y,d2z))
         return vals
 
+    def get_radients_individual(self, xyz):
+        vals = []
+        for x,y,z in xyz:
+            val = self.get_radient(x,y,z)            
+            vals.append(val)
+        return vals
+        
+    def get_laplacians_individual(self, xyz):
+        vals = []
+        for x,y,z in xyz:
+            val = self.get_laplacian(x,y,z)            
+            vals.append(val)
+        return vals
+
     def make_radient(self,dx,dy,dz):
         radient = abs(dx) + abs(dy) + abs(dz)
         #radient = dx+dy+dz                                
@@ -127,7 +141,7 @@ class Interpolator(ABC):
     def get_radients_extended_list(self, xyz):
         vals_ext = []
         for x,y,z in xyz:
-            x,y,z = self.get_adjusted_fms(x,y,z)            
+            x,y,z = self.get_adjusted_fms_maybe(x,y,z)            
             xx,xy,xz = x + self.h, y, z
             yx,yy,yz = x, y + self.h, z
             zx,zy,zz = x, y, z + self.h
@@ -140,7 +154,7 @@ class Interpolator(ABC):
     def get_laplacians_extended_list(self, xyz):
         vals_ext = []
         for x,y,z in xyz:
-            x,y,z = self.get_adjusted_fms(x,y,z)                  
+            x,y,z = self.get_adjusted_fms_maybe(x,y,z)                  
             xmx,xmy,xmz = x - self.h, y, z
             xpx,xpy,xpz = x + self.h, y, z            
             ymx,ymy,ymz = x, y - self.h, z
@@ -159,15 +173,18 @@ class Interpolator(ABC):
 
 
     def get_radient_numerical(self, x, y, z):
-        x,y,z = self.get_adjusted_fms(x,y,z)
-        val = self.get_value(x, y, z)
-        dx = (self.get_value(x + self.h, y, z) - val) / self.h
-        dy = (self.get_value(x, y + self.h, z) - val) / self.h
-        dz = (self.get_value(x, y, z + self.h) - val) / self.h        
+        xa,ya,za = x,y,z#self.get_adjusted_fms_maybe(x,y,z)
+        val = self.get_value(xa, ya, za)
+        xx,xy,xz = x+self.h,y,z#self.get_adjusted_fms_maybe(x + self.h, y, z)
+        dx = (self.get_value(xx,xy,xz) - val) / self.h
+        yx,yy,yz = x,y+self.h,z#self.get_adjusted_fms_maybe(x, y + self.h, z)
+        dy = (self.get_value(yx,yy,yz) - val) / self.h
+        zx,zy,zz = x,y,z+self.h#self.get_adjusted_fms_maybe(x, y, z + self.h)
+        dz = (self.get_value(zx,zy,zz) - val) / self.h        
         return self.make_radient(dx,dy,dz)
         
     def get_laplacian_numerical(self, x, y, z):        
-        x,y,z = self.get_adjusted_fms(x,y,z)
+        #xa,ya,za = self.get_adjusted_fms_maybe(x,y,z)
         val = self.get_value(x, y, z)
         xx = self.getDxDx_numerical(x, y, z, val)
         yy = self.getDyDy_numerical(x, y, z, val)
@@ -175,20 +192,26 @@ class Interpolator(ABC):
         return self.make_laplacian(xx,yy,zz)
         
     def getDxDx_numerical(self, x, y, z, val):        
-        va = self.get_value(x - self.h, y, z)
-        vb = self.get_value(x + self.h, y, z)
+        xa,ya,za = x - self.h, y, z#self.get_adjusted_fms_maybe(x - self.h, y, z)
+        xb,yb,zb = x + self.h, y, z#self.get_adjusted_fms_maybe(x + self.h, y, z)
+        va = self.get_value(xa,ya,za)        
+        vb = self.get_value(xb,yb,zb)
         dd = (va + vb - 2 * val) / (self.h * self.h)
         return dd
         
     def getDyDy_numerical(self, x, y, z, val):        
-        va = self.get_value(x, y - self.h, z)
-        vb = self.get_value(x, y + self.h, z)
+        xa,ya,za = x,y-self.h,z#self.get_adjusted_fms_maybe(x,y-self.h,z)
+        xb,yb,zb = x,y+self.h,z#self.get_adjusted_fms_maybe(x,y+self.h,z)
+        va = self.get_value(xa,ya,za)        
+        vb = self.get_value(xb,yb,zb)
         dd = (va + vb - 2 * val) / (self.h * self.h)
         return dd
         
     def getDzDz_numerical(self, x, y, z, val):        
-        va = self.get_value(x, y, z - self.h)
-        vb = self.get_value(x, y, z + self.h)
+        xa,ya,za = x,y,z-self.h#self.get_adjusted_fms_maybe(x,y,z-self.h)
+        xb,yb,zb = x,y,z+self.h#self.get_adjusted_fms_maybe(x,y,z+self.h)
+        va = self.get_value(xa,ya,za)        
+        vb = self.get_value(xb,yb,zb)
         dd = (va + vb - 2 * val) / (self.h * self.h)
         return dd
                 
@@ -259,6 +282,12 @@ class Interpolator(ABC):
         while u_s >= use_s+self.buffer:
             u_s -= use_s
         return round(u_f,self.round), round(u_m,self.round), round(u_s,self.round)
+
+    def get_adjusted_fms_maybe(self,x,y,z):
+        if self.padded:
+            return self.get_adjusted_fms_buffered(x,y,z)            
+        else:
+            return self.get_adjusted_fms(x,y,z)        
 
     def get_adjusted_fms(self, f, m, s,F=-1,M=-1,S=-1):                
         use_f,use_m,use_s = self._F, self._M, self._S
@@ -614,18 +643,10 @@ class Multivariate(Interpolator):
         return self.get_values_list(xyz)
 
     def get_radients(self, xyz):
-        vals = []
-        for x,y,z in xyz:
-            val = self.get_radient(x,y,z)            
-            vals.append(val)
-        return vals
-        
+        return self.get_radients_individual(xyz)
+                
     def get_laplacians(self, xyz):
-        vals = []
-        for x,y,z in xyz:
-            val = self.get_laplacian(x,y,z)            
-            vals.append(val)
-        return vals
+        return self.get_laplacians_individual(xyz)
     ## iplement abstract interface ###########################################
                
     def get_value_multivariate(self, x, y, z, coeffs,wrt=[]):        
@@ -698,14 +719,14 @@ class Multivariate(Interpolator):
         xn = round(x - np.floor(x) - pstart,self.round)
         yn = round(y - np.floor(y) - pstart,self.round)
         zn = round(z - np.floor(z) - pstart,self.round)
-        if (xn > 1 or yn > 1 or zn > 1) and self.points==2:
-            print(xn,yn,zn,x,y,z,self.points)
-        elif xn < 0 or yn < 0 or zn < 0 and self.points==2:
-            print(xn,yn,zn,x,y,z,self.points)
-        elif (xn > 2 or yn > 2 or zn > 2) and self.points==4:
-            print(xn,yn,zn,x,y,z,self.points)
-        elif (xn < 1 or yn < 1 or zn < 1) and self.points==4:
-            print(xn,yn,zn,x,y,z,self.points)
+        #if (xn > 1 or yn > 1 or zn > 1) and self.points==2:
+        #    print(xn,yn,zn,x,y,z,self.points)
+        #elif xn < 0 or yn < 0 or zn < 0 and self.points==2:
+        #    print(xn,yn,zn,x,y,z,self.points)
+        #elif (xn > 2 or yn > 2 or zn > 2) and self.points==4:
+        #    print(xn,yn,zn,x,y,z,self.points)
+        #elif (xn < 1 or yn < 1 or zn < 1) and self.points==4:
+        #    print(xn,yn,zn,x,y,z,self.points)
         
         return xn,yn,zn,polyCoeffs
     
@@ -722,7 +743,7 @@ class Bspline(Interpolator):
     """
     def init(self):                
         self.padded = True
-        self.buffer = 12
+        self.buffer = 8
         self.make_periodic_coeffs() 
     ########################################################################
     ## implement abstract interface #########################################
@@ -736,19 +757,19 @@ class Bspline(Interpolator):
         return self.get_values_list(xyz)
     
     def get_radients(self, xyz):
-        return self.get_radients_list_numerical(xyz)
-        
+        return self.get_radients_individual(xyz)
+                
     def get_laplacians(self, xyz):
-        return self.get_laplacians_list_numerical(xyz)
+        return self.get_laplacians_individual(xyz)
 
     def get_value(self, x, y, z):
         u_x, u_y, u_z = x,y,z        
         # the values need to be within the buffer zone
-        if self.padded:
-            u_x, u_y, u_z = self.get_adjusted_fms_buffered(u_x, u_y, u_z)
-            #print(u_x, u_y, u_z)
-        else:
-            u_x, u_y, u_z = self.get_adjusted_fms(u_x, u_y, u_z)
+        #if self.padded:
+        #    u_x, u_y, u_z = self.get_adjusted_fms_buffered(u_x, u_y, u_z)
+        #    #print(u_x, u_y, u_z)
+        #else:
+        #    u_x, u_y, u_z = self.get_adjusted_fms(u_x, u_y, u_z)
         weight_length = self.degree + 1
         xIndex, yIndex, zIndex = [],[],[]        
         xWeight, yWeight,zWeight = [],[],[]        
@@ -797,9 +818,17 @@ class Bspline(Interpolator):
             for j in range(spline_degree+1):
                 w1 = 0.0
                 for i in range(spline_degree+1):
-                    xc,yc,zc = xIndex[i],yIndex[j],zIndex[k]
-                    xc,yc,zc = self.get_adjusted_fms(xc,yc,zc)
-                    cc = self.get_coeff(xc,yc,zc,self._F,self._M,self._S)
+                    xc,yc,zc = xIndex[i],yIndex[j],zIndex[k]                    
+                    xo,yo,zo = xc,yc,zc                    
+                    if self.padded:
+                        xo,yo,zo = self.get_adjusted_fms_buffered(xc,yc,zc)                    
+                    else:
+                        xo,yo,zo = self.get_adjusted_fms(xc,yc,zc)
+                    #if self.padded:
+                    #    xo,yo,zo = self.get_adjusted_fms(xc,yc,zc,self._F+self.buffer*2,self._M+self.buffer*2,self._S+self.buffer*2)
+                    #else:
+                    #    xo,yo,zo = self.get_adjusted_fms(xc,yc,zc)                    
+                    cc = self.get_coeff(xo,yo,zo)
                     #print(xIndex[i],yIndex[j],zIndex[k])
                     #print(xc,yc,zc,cc)                    
                     w1 += xWeight[i] * cc
@@ -815,10 +844,11 @@ class Bspline(Interpolator):
         # we make the coefficients matrix a bit bigger than the vaues and have it wrap, and then cut it back down to the values                         
         if not self.padded:
             self.simple_copy_coeffs()            
-            self.create_coeffs(self._F,self._M,self._S)                    
+            self.create_coeffs(self._F,self._M,self._S)
         else:
             self._coeffs =self.extend_vals_with_buffer(self.buffer)
-            self.create_coeffs(self._F,self._M,self._S)        
+            self.create_coeffs(self._F+self.buffer*2,self._M+self.buffer*2,self._S+self.buffer*2)                                
+            #print(self._coeffs)
                                     
     def reduce_vals_with_buffer(self,buffer, mynpy):        
         xx,yy,zz = mynpy.shape
@@ -877,19 +907,19 @@ class Bspline(Interpolator):
     def get_row3d(self,y,z,length,F,M,S):        
         row = []
         for x in range(length):
-            row.append(self.get_coeff(x, y, z,F,M,S))
+            row.append(self.get_coeff(x, y, z))
         return row
     
     def get_col3d(self,x,z,length,F,M,S):        
         col = []
         for y in range(length):
-            col.append(self.get_coeff(x, y, z,F,M,S))
+            col.append(self.get_coeff(x, y, z))
         return col
     
     def get_hole3d(self,x,y,length,F,M,S):        
         bore = []
         for z in range(length):
-            bore.append(self.get_coeff(x, y, z,F,M,S))
+            bore.append(self.get_coeff(x, y, z))
         return bore
     
     def put_row3d(self,y,z,row,length,F,M,S):        
@@ -941,7 +971,7 @@ class Bspline(Interpolator):
             for n in range(1,int(Horizon)):
                 Sum += zn * vals[n]
                 zn *= pole       
-            return Sum        
+            return Sum                
         else:#// if (_mirror)
             #// RSA notes is this a mirror condition? when the horizon - how far you need to look ahead for good data - is not as far the data you have
             #/* full loop */
@@ -954,7 +984,7 @@ class Bspline(Interpolator):
                 Sum += (zn + z2n) * vals[n]
                 zn *= pole                
                 z2n *= iz
-            return (Sum / (1.0 - zn * zn))        
+            return (Sum / (1.0 - zn * zn))                
                 
     def initial_anticausal_coeffs(self, vals, length, pole):        
         #/* this initialization corresponds to mirror boundaries */
@@ -964,7 +994,7 @@ class Bspline(Interpolator):
             return ((pole / (pole * pole - 1.0)) * (pole * vals[length - 2] + vals[length - 1]))
             #return ((pole / (pole * pole - 1.0)) * (pole * vals[0] + vals[length - 1]))
 
-    def get_coeff(self,x,y,z,F,M,S):        
+    def get_coeff(self,x,y,z):        
         # this naturally wraps round
         #u_x, u_y, u_z = self.get_adjusted_fms(x,y,z,F=F,M=M,S=S)
         #pos = int(self.get_pos_from_fms(u_x,u_y,u_z,F=F,M=M,S=S))
@@ -981,10 +1011,10 @@ class Bspline(Interpolator):
         for i in range(weight_length):
             ws.append(0)
         w = val - idc[1]
-        if w > 1:
-            print("w=",w)
-        if w < 0:
-            print("w=",w)
+        #if w > 1:
+        #    print("w=",w)
+        #if w < 0:
+        #    print("w=",w)
         # Making it linear
         #ws[3] = 1*w/40
         #ws[0] = 1*(1-w) / 40

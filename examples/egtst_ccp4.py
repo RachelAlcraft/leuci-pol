@@ -6,10 +6,9 @@ Using WSL the show() functions creates an html page on localhost
 
 """
 ################### USER INPUTS #######################
-which_examples = [1] # could be 0-5
+which_examples = [3,4] # could be 0-5
 width = 8           # in angstrom
 samples = 50       # number of sample points along each axis to interpolate
-degree = 3
 ########### A description of the examples #############
 examples = []
 #2abcd, negative density in NOS switch
@@ -28,10 +27,23 @@ examples.append(["Fig02-em_6axz","6axz",
                   ("linear","radient","laplacian","cubic","radient","laplacian","spline","radient","laplacian")])       #0
 
 examples.append(["Fig03-em_6eex_cubic","6eex",
-                  ["(3.638,8.536,8.108)","(2.894,9.166,9.274)","(4.849,8.296,8.176)"],
-                  [("density",2,-1,0.9,0.5,(1,1),"RGB","cubic"),("radient",2,-1,1.0,1.0,(1,2),"BW","cubic"),("laplacian",1,0,0.9,0.9,(1,3),"RB","cubic")],
-                  (1,3),
-                  ("density","radient","laplacian")])       #2
+                  ["(2.939,9.67,18.422)","(3.567,9.168,19.706)","(1.823,10.185,18.428)"],
+                  [("density",2,-1,0.9,0.5,(1,1),"RGB","cubic"),("radient",2,-1,1.0,1.0,(1,2),"BW","cubic"),("laplacian",1,0,0.9,0.9,(1,3),"RB","cubic"),
+                  ("density",2,-1,0.9,0.5,(2,1),"RGB","bspline"),("radient",2,-1,1.0,1.0,(2,2),"BW","bspline"),("laplacian",1,0,0.9,0.9,(2,3),"RB","bspline")],
+                  (2,3),
+                  ("cubic","radient","laplacian","bspline","radient","laplacian")])       #2
+
+examples.append(["Fig_6eex_cub_spl","6eex",
+                  ["(2.939,9.67,18.422)","(3.567,9.168,19.706)","(1.823,10.185,18.428)"],
+                  [("laplacian",1,0,0.9,0.9,(1,1),"RB","bspline"),("laplacian",1,0,0.9,0.9,(1,2),"RB","cubic")],
+                  (1,2),
+                  ("bspline","cubic")])       #2
+
+examples.append(["Fig_6axz_cub_spl","6axz",
+                  ["(-0.919,-1.242,7.415)","(-1.53,-2.311,6.507)","(0.261,-0.895,7.258)"],
+                  [("laplacian",1,0,0.9,0.9,(1,1),"RB","bspline"),("laplacian",1,0,0.9,0.9,(1,2),"RB","cubic")],
+                  (1,2),
+                  ("bspline","cubic")])       #2
 
 examples.append(["Fig03-em_6eex_bspline","6eex",
                   ["(3.638,8.536,8.108)","(2.894,9.166,9.274)","(4.849,8.296,8.176)"],
@@ -134,17 +146,17 @@ for which_example in which_examples:
     fig = make_subplots(rows=plot_config[0], cols=plot_config[1],subplot_titles=(names),horizontal_spacing=0.05,vertical_spacing=0.05)
   
   
-  mf = mfun.MapFunctions(pdb_code,ml.mobj,ml.pobj,"linear",degree=degree)
+  mf = mfun.MapFunctions(pdb_code,ml.mobj,ml.pobj,"linear")
   for deriv,fo,fc,min_per,max_per, plot_pos,hue,interp_method in plots:    
     print("Plot details=",deriv,fo,fc,min_per,max_per)        
     loadeds[pdb_code] = mf
     vals = [[]]
     if deriv == "density":    
-      vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=0,fo=fo,fc=fc,degree=degree)
+      vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=0,fo=fo,fc=fc)
     elif deriv == "radient":
-      vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=1,fo=fo,fc=fc,degree=degree)
+      vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=1,fo=fo,fc=fc)
     elif deriv == "laplacian":
-      vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=2,fo=fo,fc=fc,degree=degree)
+      vals = mf.get_slice(central,linear,planar,width,samples,interp_method,deriv=2,fo=fo,fc=fc)
     ###############################################################################
     # Showing the plots in plotly
     # reference: https://plotly.com/python/contour-plots/
@@ -175,7 +187,7 @@ for which_example in which_examples:
       data_vals = go.Heatmap(z=vals,colorscale=['Black','Snow'],showscale=False,zmin=absmin,zmax=absmax)
     elif hue == "RB":
       data_vals = go.Contour(z=vals,showscale=True,
-                            colorscale=[(0, "rgb(100,0,0)"),(0.1, "crimson"), (d0, "silver"), (0.9, "blue"),(1, "navy")],
+                            colorscale=[(0, "rgb(100,0,0)"),(0.1, "crimson"), (d0, "snow"), (0.9, "blue"),(1, "navy")],
                             contours=dict(start=absmin,end=absmax,size=(absmax-absmin)/20),
                             line=dict(width=0.5,color="darkgray"),
                             zmin=absmin,zmax=absmax)
@@ -196,8 +208,8 @@ for which_example in which_examples:
   rows, cols =plot_config[0],plot_config[1]
   wdth = 2000
   hight = int(wdth * rows/cols)
-  fig.write_image(EG_DIR +"eg001_eg_" + plotid + str(degree) + ".jpg",width=wdth,height=hight)
-  fig.write_html(EG_DIR +"eg001_eg_" + plotid + str(degree) + ".html")
-  print("#### Created image at", EG_DIR +"eg001_eg_" + plotid +str(degree)+ ".jpg ####")
+  fig.write_image(EG_DIR +"eg001_eg_" + plotid + ".jpg",width=wdth,height=hight)
+  fig.write_html(EG_DIR +"eg001_eg_" + plotid + ".html")
+  print("#### Created image at", EG_DIR +"eg001_eg_" + plotid + " ####")
   dt2 = datetime.datetime.now()
   print("completed in", dt2-dt1)

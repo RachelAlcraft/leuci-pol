@@ -23,7 +23,7 @@ import leuci_xyz.vectorthree as v3
 ########## INPUTS #################
 pdb_code = "6eex"
 #interp_methods = ["nearest","linear","cubic","bspline","mspline"]
-interp_methods = ["mspline"]
+interp_methods = ["bspline"]
 ########## EXAMPLE #################
 def query_pdb():
     print("Showing pdb details", pdb_code)

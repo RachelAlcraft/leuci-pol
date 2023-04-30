@@ -21,9 +21,9 @@ if True:
   degree = 3  
   test_methods = ["nearest","linear","cubic","bspline"]
   test_methods = ["nearest","linear","mv0","mv1","cubic","bspline"]
-  #test_methods = ["cubic"]
-  width=20
-  samples=61
+  #test_methods = ["cubic","bspline"]
+  width=10
+  samples=51
   ###################################
   ## GRID ##
   gm = grid.GridMaker()
@@ -44,7 +44,16 @@ if True:
       print("####### Testing", interp_method, "########")
       ## the 3d data is in a list of values, 
       ## with the fastest changing axis first, 
-      ## called F, M, S (fast, medium, slow)
+      ## called F, M, S (fast, medium, slow)      
+      import numpy as np
+      vals = np.zeros([30,50,70])
+      for i in range(30):
+        for j in range(50):
+          for k in range(35):
+            vals[i,j,k] = i+j+k      
+          for k in range(35,70):
+            vals[i,j,k] = i-j-k      
+      
       #vals = [[[1,2],[3,4]],[[5,6],[7,8]]]
       vals = [[[1,2,3,4,5],[6,7,8,9,10]],[[11,12,13,14,15],[16,17,18,19,20]]]      
       f,m,s = len(vals),len(vals[0]),len(vals[0][0])    
