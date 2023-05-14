@@ -45,6 +45,7 @@ def create_interpolator(method, values, F, M, S, log_level=0,degree=-1):
 class Interpolator(ABC):
     def __init__(self, values, F, M, S, degree=-1,log_level=0):                             
         self._npy = np.copy(values).astype(float)
+        self._orig = np.copy(values).astype(float)
         self._F = F
         self._M = M
         self._S = S
@@ -224,11 +225,11 @@ class Interpolator(ABC):
     def get_projection(self,slice,xmin=-1,xmax=-1,ymin=-1,ymax=-1):
         vals = None        
         if slice == "xy":        
-            vals = self._npy.max(axis=(2))
+            vals = self._orig.max(axis=(2))
         elif slice == "yz":        
-            vals = self._npy.max(axis=(0))
+            vals = self._orig.max(axis=(0))
         elif slice == "zx":        
-            vals = self._npy.max(axis=(1))
+            vals = self._orig.max(axis=(1))
         
         if xmin == -1 and xmax == -1 and ymin == -1 and ymax == -1:
             return vals
@@ -250,11 +251,11 @@ class Interpolator(ABC):
     
     def get_cross_section(self,slice,layer):        
         if slice == "xy":        
-            return self._npy[:,:,layer]
+            return self._orig[:,:,layer]
         elif slice == "yz":        
-            return self._npy[layer,:,:]            
+            return self._orig[layer,:,:]            
         elif slice == "zx":        
-            return self._npy[:,layer,:]
+            return self._orig[:,layer,:]
             get_adjusted_fmsbuild
     def get_pos_from_fms(self, f, m, s,F=-1,M=-1,S=-1):
         use_f,use_m,use_s = self._F, self._M, self._S
