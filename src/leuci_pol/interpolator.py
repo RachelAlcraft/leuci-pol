@@ -4,6 +4,7 @@
 """
 from abc import ABC, abstractmethod
 from leuci_xyz import vectorthree as v3
+from leuci_xyz import matrix3d as d3
 import math
 import numpy as np
 
@@ -16,9 +17,24 @@ from . import iv5
 
 
 ### Factory method for creation ##############################################################
-def create_interpolator(method, values, F, M, S, log_level=0,degree=-1):
+def create_interpolator(method, values, F, M, S, as_sd=0, log_level=0,degree=-1):
+    if as_sd > 0:#0 = no change, 1 = z-distribution, 2 = z-dist and tranpose
+        # Make a z-distribtion
+        sd = np.std(values)
+        mean = np.mean(values)        
+        values = (values - mean)/sd        
+        if as_sd > 1:
+            # transpose so zero is still zero
+            zero = (0-mean)/sd
+            values = (values - zero)
+                
     if log_level > 0:
         print("Interpolator:",method,F,M,S)
+        print("Mean=",np.mean(values))
+        print("Std=",np.std(values))
+        print("Min=",np.min(values))
+        print("Max=",np.max(values))
+                                
     intr = None
     if method == "nearest":
         intr = Numpest(values,F, M, S,1, log_level)    
@@ -31,9 +47,7 @@ def create_interpolator(method, values, F, M, S, log_level=0,degree=-1):
     elif method == "mv3" or method == "cubic":
         intr = Multivariate(values,F, M, S,3,log_level)
     elif method == "mv5" or method == "quintic":
-        intr = Multivariate(values,F, M, S,5,log_level)    
-    elif method == "bspline5":
-        intr = Bspline(values,F, M, S, 5, log_level) # I am being cautious about degrees    
+        intr = Multivariate(values,F, M, S,5,log_level)        
     elif method == "bspline":### degree 3 by default ###    
         intr = Bspline(values,F, M, S,3, log_level) 
     else: 
@@ -56,6 +70,8 @@ class Interpolator(ABC):
         self.buffer = 12
         self.round = 12
         self.TOLERANCE = 2.2204460492503131e-016 # smallest such that 1.0+DBL_EPSILON != 1.0                                
+        self.min = np.min(self._npy)
+        self.max = np.max(self._npy)
     ############################################################################################################            
     @abstractmethod
     def get_value(self, x, y, z):
@@ -358,14 +374,13 @@ class Interpolator(ABC):
         return cnrs
     
     def get_val_slice(self,unit_coords, deriv = 0):        
-        vals = []                
-        if True:
-            coords = []
-            for i in range(len(unit_coords)):
-                row = []
-                for j in range(len(unit_coords[0])):
-                    vec = unit_coords[i][j]
-                    coords.append([vec.A,vec.B,vec.C])
+        a,b,c = unit_coords.shape()        
+        coords = []
+        if True:            
+            for i in range(a):                
+                for j in range(b):                    
+                    vec = unit_coords.get(i,j,0)
+                    coords.append([vec.A,vec.B,vec.C])                
             if deriv == 2:
                 vals = self.get_laplacians(coords)
             elif deriv == 1:
@@ -373,15 +388,40 @@ class Interpolator(ABC):
             else:
                 vals = self.get_values(coords)            
             # put back into shape
-            vals_grid = []
+            ret_vals = []            
             count = 0
-            for i in range(len(unit_coords)):
+            for i in range(a):                
                 row = []
-                for j in range(len(unit_coords[0])):
+                for j in range(b):                    
                     row.append(vals[count])
-                    count += 1
-                vals_grid.append(row)
-            return vals_grid
+                    count += 1                
+                ret_vals.append(row)
+            return ret_vals
+    
+    def get_val_slice3d(self,unit_coords, deriv = 0):        
+        a,b,c = unit_coords.shape()        
+        coords = []
+        if True:            
+            for i in range(a):
+                for j in range(b):
+                    for k in range(c):
+                        vec = unit_coords.get(i,j,k)
+                        coords.append([vec.A,vec.B,vec.C])                
+            if deriv == 2:
+                vals = self.get_laplacians(coords)
+            elif deriv == 1:
+                vals = self.get_radients(coords)
+            else:
+                vals = self.get_values(coords)            
+            # put back into shape
+            ret_vals = d3.Matrix3d(a,b,c)
+            count = 0
+            for i in range(a):                                
+                for j in range(b):                                        
+                    for k in range(c):
+                        ret_vals.add(i,j,k=k,data=vals[count])
+                        count += 1                                                    
+            return ret_vals
         
 
     def build_cube_around(self, x, y, z, width):        

@@ -18,7 +18,7 @@ from leuci_xyz import vectorthree as v3
 degree = 3
 #test_methods = ["nearest","linear","cubic","bspline"]
 test_methods = ["nearest","mv0","mv1","linear","mv3","bspline"]
-test_methods = ["bspline"]
+#test_methods = ["nearest"]
 ###################################
 for interp_method in test_methods:
     print("############# Testing", interp_method, "########################")    

@@ -27,7 +27,8 @@ linear = v3.VectorThree(1,1,0)
 planar = v3.VectorThree(0,0,0)
 width=2
 samples=5
-method="mspline"
+depth = 2
+method="linear"
 
 ########## EXAMPLE #################
 def nearest_slice():    
@@ -36,14 +37,19 @@ def nearest_slice():
     itrp = pol.create_interpolator(method,vals,F=f,M=m,S=s,log_level=1, degree=3)
     spc = space.SpaceTransform(central, linear, planar)
     gm = grid.GridMaker()    
-    u_coords = gm.get_unit_grid(width,samples)        
+    u_coords = gm.get_unit_grid(width,samples,depth_samples=depth)
+    u_coords.print()
     xyz_coords = spc.convert_coords(u_coords)    
+    #xyz_coords.print()    
     sl_vals = itrp.get_val_slice(xyz_coords)
+    print("Values", sl_vals)
+    """
     sl_rads = itrp.get_val_slice(xyz_coords,deriv=1)
     sl_laps = itrp.get_val_slice(xyz_coords,deriv=2)
-    print("Values", sl_vals)
+    
     print("Radient", sl_rads)
     print("Laplacian", sl_laps)
+    """
     
     
 ######################################################

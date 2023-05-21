@@ -19,9 +19,9 @@ if True:
   print("### Visual Test ###")
   ########## INPUTS #################
   degree = 3  
-  test_methods = ["nearest","linear","cubic","bspline"]
-  test_methods = ["nearest","linear","mv0","mv1","cubic","bspline"]
-  #test_methods = ["cubic","bspline"]
+  #test_methods = ["nearest","linear","cubic","bspline"]
+  #test_methods = ["nearest","linear","mv0","mv1","cubic","bspline"]
+  test_methods = ["bspline"]
   width=10
   samples=51
   ###################################
@@ -57,7 +57,7 @@ if True:
       #vals = [[[1,2],[3,4]],[[5,6],[7,8]]]
       vals = [[[1,2,3,4,5],[6,7,8,9,10]],[[11,12,13,14,15],[16,17,18,19,20]]]      
       f,m,s = len(vals),len(vals[0]),len(vals[0][0])    
-      intr = pol.create_interpolator(interp_method,vals,F=f,M=m,S=s,log_level=1)
+      intr = pol.create_interpolator(interp_method,vals,F=f,M=m,S=s,log_level=1,as_sd=2)
       print("---creating values", datetime.datetime.now())
       dvals = intr.get_val_slice(xyz_coords,deriv=0)      
       rvals = intr.get_val_slice(xyz_coords,deriv=1)
@@ -68,9 +68,9 @@ if True:
 
       minl,maxl = 1000,-1000    
       for i in range(len(lvals)):
-        for j in range(len(lvals[0])):        
+        for j in range(len(lvals[0])):                  
           minl = min(lvals[i][j],minl)
-          maxl = max(lvals[i][j],maxl)              
+          maxl = max(lvals[i][j],maxl)
       l0 = 0.5
       if minl < 0:
         l0 = (0 - minl) / (maxl - minl)

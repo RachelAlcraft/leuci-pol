@@ -29,7 +29,7 @@ if True:
       vals = [[[1,2],[3,4]],[[5,6],[7,8]]]
       #vals = [[[1,2,3,4,5],[6,7,8,9,10]],[[11,12,13,14,15],[16,17,18,19,20]]]      
       f,m,s = len(vals),len(vals[0]),len(vals[0][0])    
-      intr = pol.create_interpolator(interp_method,vals,F=f,M=m,S=s,log_level=1)
+      intr = pol.create_interpolator(interp_method,vals,F=f,M=m,S=s,log_level=2)
       print("---creating values", datetime.datetime.now())
       projXY = intr.get_projection("xy", -7,3,-2,3)
       projYZ = intr.get_projection("yz", -7,3,-2,3)

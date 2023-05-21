@@ -10,7 +10,7 @@ CODEDIR = str(Path(__file__).resolve().parent.parent )+ "/src/"
 import sys
 sys.path.append(CODEDIR)
 from pathlib import Path
-import leuci_pol.interpolator_old as pol
+import leuci_pol.interpolator as pol
 from leuci_xyz import vectorthree as v3
 from leuci_xyz import gridmaker as grid
 from leuci_xyz import spacetransform as space
