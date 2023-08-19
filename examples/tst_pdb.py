@@ -44,7 +44,7 @@ def single_slice():
             s = po.mobj.S
             print("Creating slice", pdb_code)
             
-            itrp = pol.create_interpolator("nearest",vals,F=f,M=m,S=s,log_level=1)    
+            itrp = pol.create_interpolator("nearest",vals,FMS=(f,m,s),log_level=1)    
             spc = space.SpaceTransform(central, linear, planar)
             gm = grid.GridMaker()    
             u_coords = gm.get_unit_grid(width,samples)        

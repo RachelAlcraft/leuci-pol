@@ -34,7 +34,7 @@ for interp_method in test_methods:
     
     f,m,s = len(vals),len(vals[0]),len(vals[0][0])
     # simplest creation of an interpolator, add values, specify the axis, ask for a value
-    intr = pol.create_interpolator(interp_method,vals,F=f,M=m,S=s,log_level=1)    
+    intr = pol.create_interpolator(interp_method,vals,FMS=(f,m,s),log_level=1)    
     all_once = True
     if all_once:
         pnts = [(0,0,0),(0,0,1),(0,1,0),(0,1,1),(1,0,0),(1,0,1),(1,1,0),(1,1,1),(0.5,0.5,0.5),(-0.5,-0.5,-0.5),(-1,-1,-1),(2,2,2)]

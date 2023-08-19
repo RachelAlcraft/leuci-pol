@@ -24,7 +24,7 @@ def nearest_interp():
     vals = [[[1,2],[3,4]],[[5,6],[7,8]]]
     f,m,s = 2,2,2
     # simplest creation of an interpolator, add values, specify the axis, ask for a value
-    intr = pol.create_interpolator("nearest",vals,F=f,M=m,S=s,log_level=1)    
+    intr = pol.create_interpolator("nearest",vals,FMS=(f,m,s),log_level=1)    
     print("... =", intr.get_value(0.2,0.2,0.6)) 
     print("This would get 0,0,1, which is 5")
 

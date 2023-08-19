@@ -57,11 +57,11 @@ if True:
       #vals = [[[1,2],[3,4]],[[5,6],[7,8]]]
       vals = [[[1,2,3,4,5],[6,7,8,9,10]],[[11,12,13,14,15],[16,17,18,19,20]]]      
       f,m,s = len(vals),len(vals[0]),len(vals[0][0])    
-      intr = pol.create_interpolator(interp_method,vals,F=f,M=m,S=s,log_level=1,as_sd=2)
+      intr = pol.create_interpolator(interp_method,vals,FMS=(f,m,s),log_level=1,as_sd=2)
       print("---creating values", datetime.datetime.now())
-      dvals = intr.get_val_slice(xyz_coords,deriv=0)      
-      rvals = intr.get_val_slice(xyz_coords,deriv=1)
-      lvals = intr.get_val_slice(xyz_coords,deriv=2)
+      dvals = intr.get_val_slice(xyz_coords,deriv=0,ret_type="2d")      
+      rvals = intr.get_val_slice(xyz_coords,deriv=1,ret_type="2d")      
+      lvals = intr.get_val_slice(xyz_coords,deriv=2,ret_type="2d")      
       
       print("---making plots", datetime.datetime.now())
       data_rads = go.Heatmap(z=rvals,colorscale=['Black','Snow'],showscale=False)      

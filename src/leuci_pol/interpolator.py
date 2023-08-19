@@ -17,7 +17,29 @@ from . import iv5
 
 
 ### Factory method for creation ##############################################################
-def create_interpolator(method, values, F, M, S, as_sd=0, log_level=0,degree=-1):
+def create_interpolator(method, values, FMS, as_sd=0, log_level=0):
+    """
+    Factory method to create interpolator classes.
+
+    Parameters
+    ----------
+    method : string
+        The name of the interpolation method, nearest/linear/cubic/bspline
+    values : numpy 3d array
+        The matrix values, 0 indexed 3d
+    FMS : a tuple (F,M,S) of ints
+        The dimensions of the data
+    as_sd : int (0,1,2)
+        The choice of whether to turn the data into a z-distribution (1) or z=dist with 0 preserved (2)
+    log_level : int=0
+        How much logging you want to see
+
+    Return
+    ------
+    None
+
+    """
+
     if as_sd > 0:#0 = no change, 1 = z-distribution, 2 = z-dist and tranpose
         # Make a z-distribtion
         sd = np.std(values)
@@ -29,7 +51,7 @@ def create_interpolator(method, values, F, M, S, as_sd=0, log_level=0,degree=-1)
             values = (values - zero)
                 
     if log_level > 0:
-        print("Interpolator:",method,F,M,S)
+        print("Interpolator:",method,FMS)
         print("Mean=",np.mean(values))
         print("Std=",np.std(values))
         print("Min=",np.min(values))
@@ -37,19 +59,19 @@ def create_interpolator(method, values, F, M, S, as_sd=0, log_level=0,degree=-1)
                                 
     intr = None
     if method == "nearest":
-        intr = Numpest(values,F, M, S,1, log_level)    
+        intr = Numpest(values,FMS,1, log_level)    
     elif method == "mv0":
-        intr = Nearest(values,F, M, S,1, log_level)
+        intr = Nearest(values,FMS,1, log_level)
     elif method == "linear":
-        intr = Linear(values,F, M, S,1, log_level)
+        intr = Linear(values,FMS,1, log_level)
     elif method == "mv1":
-        intr = Multivariate(values,F, M, S,1,log_level)
+        intr = Multivariate(values,FMS,1,log_level)
     elif method == "mv3" or method == "cubic":
-        intr = Multivariate(values,F, M, S,3,log_level)
+        intr = Multivariate(values,FMS,3,log_level)
     elif method == "mv5" or method == "quintic":
-        intr = Multivariate(values,F, M, S,5,log_level)        
+        intr = Multivariate(values,FMS,5,log_level)        
     elif method == "bspline":### degree 3 by default ###    
-        intr = Bspline(values,F, M, S,3, log_level) 
+        intr = Bspline(values,FMS,3, log_level) 
     else: 
         raise(Exception("Method not known " + method))
     intr.init()
@@ -57,12 +79,10 @@ def create_interpolator(method, values, F, M, S, as_sd=0, log_level=0,degree=-1)
 
 ### Abstract class ############################################################################
 class Interpolator(ABC):
-    def __init__(self, values, F, M, S, degree=-1,log_level=0):                             
+    def __init__(self, values, FMS, degree=-1,log_level=0):                             
         self._npy = np.copy(values).astype(float)
         self._orig = np.copy(values).astype(float)
-        self._F = F
-        self._M = M
-        self._S = S
+        self._F, self._M, self._S = FMS
         self.degree = degree        
         self.log_level = log_level         
         self.h = 0.0001 #this is the interval for numerical differentiation        
@@ -93,6 +113,7 @@ class Interpolator(ABC):
         pass
     ############################################################################################################
     # implemented interface that is the same for all abstractions
+
     def adj_values_list(self, xyz):
         xyz2 = []
         for x,y,z in xyz:
@@ -232,12 +253,9 @@ class Interpolator(ABC):
         dd = (va + vb - 2 * val) / (self.h * self.h)
         return dd
                 
-    def get_fms(self,f,m,s,F=-1,M=-1,S=-1):        
-        #u_f, u_m, u_s = self.get_adjusted_fms(f,m,s,F,M,S)
+    def get_fms(self,f,m,s):
         return self._npy[int(f),int(m),int(s)]
-        #pos = self.get_pos_from_fms(u_f,u_m,u_s,F,M,S)
-        #return self._values[pos]
-    
+            
     def get_projection(self,slice,xmin=-1,xmax=-1,ymin=-1,ymax=-1):
         vals = None        
         if slice == "xy":        
@@ -272,7 +290,7 @@ class Interpolator(ABC):
             return self._orig[layer,:,:]            
         elif slice == "zx":        
             return self._orig[:,layer,:]
-            get_adjusted_fmsbuild
+            
     def get_pos_from_fms(self, f, m, s,F=-1,M=-1,S=-1):
         use_f,use_m,use_s = self._F, self._M, self._S
         if F+M+S != -3:
@@ -373,7 +391,26 @@ class Interpolator(ABC):
                     cnrs.append(v3.VectorThree(x+f,y+m,z+s)) 
         return cnrs
     
-    def get_val_slice(self,unit_coords, deriv = 0):        
+    def get_val_slice(self,unit_coords, deriv = 0, ret_type = "vals"):
+        """
+        Gets a 2d slice of values given the coordinates
+
+        Paramaters
+        ------------
+        unit_coords : list[list] of Vector3d
+            The 2d 3d coordinates unit and orthogonal based
+        deriv: int (0,1,2)
+            The choice of derivate: value, radient or laplacian
+        ret_type : string ("vals","np")
+            The return type, val[][] or np
+
+        Returns
+        --------
+        val[][] or np
+            As requested in ret_type
+        
+        """
+
         a,b,c = unit_coords.shape()        
         coords = []
         if True:            
@@ -387,18 +424,43 @@ class Interpolator(ABC):
                 vals = self.get_radients(coords)
             else:
                 vals = self.get_values(coords)            
-            # put back into shape
-            ret_vals = []            
+            
+            ret_vals = d3.Matrix3d(a,b)
             count = 0
-            for i in range(a):                
-                row = []
-                for j in range(b):                    
-                    row.append(vals[count])
-                    count += 1                
-                ret_vals.append(row)
-            return ret_vals
+            for i in range(a):                                
+                for j in range(b):                                                            
+                    ret_vals.add(i,j,data=vals[count])
+                    count += 1                                                    
+            
+            if ret_type == "np":
+                return ret_vals.get_as_np()
+            elif ret_type == "vals":
+                return ret_vals.matrix
+            elif ret_type == "2d":
+                return ret_vals.get_as_np(is2d=True)
+            else:
+                return ret_vals
     
-    def get_val_slice3d(self,unit_coords, deriv = 0):        
+    def get_val_slice3d(self,unit_coords, deriv = 0, ret_type = "3d"):
+        """
+        Gets a 3d slice of values given the coordinates
+
+        Paramaters
+        ------------
+        unit_coords : list[list] of Vector3d
+            The 2d 3d coordinates unit and orthogonal based
+        deriv: int (0,1,2)
+            The choice of derivate: value, radient or laplacian
+        ret_type : string ("vals","np","3d")
+            The return type, val[][] or np or 3d
+
+        Returns
+        --------
+        val[][] or np or 3d
+            As requested in ret_type
+        
+        """
+
         a,b,c = unit_coords.shape()        
         coords = []
         if True:            
@@ -421,7 +483,14 @@ class Interpolator(ABC):
                     for k in range(c):
                         ret_vals.add(i,j,k=k,data=vals[count])
                         count += 1                                                    
-            return ret_vals
+            if ret_type == "np":
+                return ret_vals.get_as_np()
+            elif ret_type == "vals":
+                return ret_vals.matrix
+            elif ret_type == "2d":
+                return ret_vals.get_as_np(is2d=True)
+            else:
+                return ret_vals
         
 
     def build_cube_around(self, x, y, z, width):        

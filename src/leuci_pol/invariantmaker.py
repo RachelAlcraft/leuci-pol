@@ -8,7 +8,7 @@ import math
 
 class InvariantMaker(object):
     def __init__(self, dimensions):                
-        self.round = 14
+        self.round = 12
         dimX, dimY, dimZ = dimensions[0],1,1
         if len(dimensions) > 1:
             dimY = dimensions[1]

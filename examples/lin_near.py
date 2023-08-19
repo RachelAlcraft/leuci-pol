@@ -24,8 +24,8 @@ def nearest_interp():
     # the 3d data is in a list of values, with the fastest changing axis first, called F, M, S (fast, medium, slow)
     vals = [[[1,2],[3,4]],[[5,6],[7,8]]]
     f,m,s = 2,2,2
-    nr_pol = pol.create_interpolator("nearest",vals,F=f,M=m,S=s)
-    lin_pol = pol.create_interpolator("linear",vals,F=f,M=m,S=s)
+    nr_pol = pol.create_interpolator("nearest",vals,FMS=(f,m,s))
+    lin_pol = pol.create_interpolator("linear",vals,FMS=(f,m,s))
     for intr in [nr_pol, lin_pol]:    
         print("Using ", type(intr))
         #print("Is interpolator", isinstance(intr,inter.Interpolator))

@@ -27,7 +27,7 @@ method="nearest"
 def nearest_slice():
     print("Checking simple nearest slice")
     # the 3d data is in a list of values, with the fastest changing axis first, called F, M, S (fast, medium, slow)        
-    itrp = pol.create_interpolator(method,vals,F=f,M=m,S=s,log_level=1)                
+    itrp = pol.create_interpolator(method,vals,FMS=(f,m,s),log_level=1)                
     valsxy1 = itrp.get_cross_section("xy",0)
     valsxy2 = itrp.get_cross_section("xy",1)
     print("xy1", valsxy1)

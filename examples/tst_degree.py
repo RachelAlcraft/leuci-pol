@@ -22,10 +22,10 @@ def degree_tst():
     vals = [[[1,2],[3,4]],[[5,6],[7,8]]]
     f,m,s = 2,2,2
     # simplest creation of an interpolator, add values, specify the axis, ask for a value
-    intrc3 = pol.create_interpolator("cubic",vals,F=f,M=m,S=s,log_level=1,degree=3)    
-    intrc5 = pol.create_interpolator("cubic",vals,F=f,M=m,S=s,log_level=1,degree=5)    
-    intrb3 = pol.create_interpolator("bspline",vals,F=f,M=m,S=s,log_level=1,degree=3)    
-    intrb5 = pol.create_interpolator("bspline",vals,F=f,M=m,S=s,log_level=1,degree=5)
+    intrc3 = pol.create_interpolator("cubic",vals,FMS=(f,m,s),log_level=1)
+    intrc5 = pol.create_interpolator("cubic",vals,FMS=(f,m,s),log_level=1)
+    intrb3 = pol.create_interpolator("bspline",vals,FMS=(f,m,s),log_level=1)
+    intrb5 = pol.create_interpolator("bspline",vals,FMS=(f,m,s),log_level=1)
 
     iterps = [intrc3,intrc5,intrb3,intrb5]
 
